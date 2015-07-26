@@ -1,0 +1,37 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.23107.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SRM251Q1", "SRM251Q1\SRM251Q1.csproj", "{F131BE75-5A77-44F2-85BF-A27D4FFA383B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SRM251Q2", "SRM251Q2\SRM251Q2.csproj", "{C2402F8F-BD9E-4BA1-BC4D-E9AFFEDD5D90}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SRM251Q3", "SRM251Q3\SRM251Q3.csproj", "{631EEA52-88FF-4DC9-9568-D3F891372856}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F131BE75-5A77-44F2-85BF-A27D4FFA383B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F131BE75-5A77-44F2-85BF-A27D4FFA383B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F131BE75-5A77-44F2-85BF-A27D4FFA383B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F131BE75-5A77-44F2-85BF-A27D4FFA383B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C2402F8F-BD9E-4BA1-BC4D-E9AFFEDD5D90}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C2402F8F-BD9E-4BA1-BC4D-E9AFFEDD5D90}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C2402F8F-BD9E-4BA1-BC4D-E9AFFEDD5D90}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C2402F8F-BD9E-4BA1-BC4D-E9AFFEDD5D90}.Release|Any CPU.Build.0 = Release|Any CPU
+		{631EEA52-88FF-4DC9-9568-D3F891372856}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{631EEA52-88FF-4DC9-9568-D3F891372856}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{631EEA52-88FF-4DC9-9568-D3F891372856}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{631EEA52-88FF-4DC9-9568-D3F891372856}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(VSIntegration.BindingRedirects) = postSolution
+		MinRedirectVersion = 6.0.0.0
+		MaxRedirectVersion = 6.0.9999.0
+	EndGlobalSection
+EndGlobal

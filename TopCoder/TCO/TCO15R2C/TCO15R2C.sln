@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.22823.1
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TCO15R2CQ1", "TCO15R2CQ1\TCO15R2CQ1.csproj", "{047298CE-2D12-40C3-8D37-0B8198B7BC16}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TCO15R2CQ2", "TCO15R2CQ2\TCO15R2CQ2.csproj", "{7240C11F-6637-4003-91A4-1E954C8A04A6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TCO15R2CQ3", "TCO15R2CQ3\TCO15R2CQ3.csproj", "{B284E11B-DA0B-44DB-9E3D-E33989420322}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{047298CE-2D12-40C3-8D37-0B8198B7BC16}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{047298CE-2D12-40C3-8D37-0B8198B7BC16}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{047298CE-2D12-40C3-8D37-0B8198B7BC16}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{047298CE-2D12-40C3-8D37-0B8198B7BC16}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7240C11F-6637-4003-91A4-1E954C8A04A6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7240C11F-6637-4003-91A4-1E954C8A04A6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7240C11F-6637-4003-91A4-1E954C8A04A6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7240C11F-6637-4003-91A4-1E954C8A04A6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B284E11B-DA0B-44DB-9E3D-E33989420322}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B284E11B-DA0B-44DB-9E3D-E33989420322}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B284E11B-DA0B-44DB-9E3D-E33989420322}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B284E11B-DA0B-44DB-9E3D-E33989420322}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

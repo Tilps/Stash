@@ -1,0 +1,32 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TCO12R1BQ1", "TCO12R1CQ1\TCO12R1BQ1.csproj", "{971B3456-8F48-4F59-A661-26BC059D4367}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TCO12R1BQ2", "TCO12R1CQ2\TCO12R1BQ2.csproj", "{0988772A-388B-415C-AA72-7D8EA5510174}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TCO12R1BQ3", "TCO12R1CQ3\TCO12R1BQ3.csproj", "{FCA8EB2E-FC85-46F9-991C-C81AD695A609}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x86 = Debug|x86
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{971B3456-8F48-4F59-A661-26BC059D4367}.Debug|x86.ActiveCfg = Debug|x86
+		{971B3456-8F48-4F59-A661-26BC059D4367}.Debug|x86.Build.0 = Debug|x86
+		{971B3456-8F48-4F59-A661-26BC059D4367}.Release|x86.ActiveCfg = Release|x86
+		{971B3456-8F48-4F59-A661-26BC059D4367}.Release|x86.Build.0 = Release|x86
+		{0988772A-388B-415C-AA72-7D8EA5510174}.Debug|x86.ActiveCfg = Debug|x86
+		{0988772A-388B-415C-AA72-7D8EA5510174}.Debug|x86.Build.0 = Debug|x86
+		{0988772A-388B-415C-AA72-7D8EA5510174}.Release|x86.ActiveCfg = Release|x86
+		{0988772A-388B-415C-AA72-7D8EA5510174}.Release|x86.Build.0 = Release|x86
+		{FCA8EB2E-FC85-46F9-991C-C81AD695A609}.Debug|x86.ActiveCfg = Debug|x86
+		{FCA8EB2E-FC85-46F9-991C-C81AD695A609}.Debug|x86.Build.0 = Debug|x86
+		{FCA8EB2E-FC85-46F9-991C-C81AD695A609}.Release|x86.ActiveCfg = Release|x86
+		{FCA8EB2E-FC85-46F9-991C-C81AD695A609}.Release|x86.Build.0 = Release|x86
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

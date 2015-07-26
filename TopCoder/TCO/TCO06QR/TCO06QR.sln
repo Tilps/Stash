@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.23107.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TCO06QRQ1", "TCO06QRQ1\TCO06QRQ1.csproj", "{CE61110B-21AD-41F4-BCC7-70637A72E2DB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TCO06QRQ2", "TCO06QRQ2\TCO06QRQ2.csproj", "{18DCB036-829B-4D1E-8C51-E08D8115CD36}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CE61110B-21AD-41F4-BCC7-70637A72E2DB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CE61110B-21AD-41F4-BCC7-70637A72E2DB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CE61110B-21AD-41F4-BCC7-70637A72E2DB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CE61110B-21AD-41F4-BCC7-70637A72E2DB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{18DCB036-829B-4D1E-8C51-E08D8115CD36}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{18DCB036-829B-4D1E-8C51-E08D8115CD36}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{18DCB036-829B-4D1E-8C51-E08D8115CD36}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{18DCB036-829B-4D1E-8C51-E08D8115CD36}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
