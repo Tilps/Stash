@@ -1,0 +1,32 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GCJ10QRQ1", "GCJ10QRQ1\GCJ10QRQ1.csproj", "{C84DB9D2-D040-4B61-B56F-7AE53B3708F9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GCJ10QRQ2", "GCJ10QRQ2\GCJ10QRQ2.csproj", "{1B547910-6281-45AC-A21D-0FA7967249EC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GCJ10QRQ3", "GCJ10QRQ3\GCJ10QRQ3.csproj", "{6D75187A-BE36-4AB3-8303-49B38DB04403}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x86 = Debug|x86
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C84DB9D2-D040-4B61-B56F-7AE53B3708F9}.Debug|x86.ActiveCfg = Debug|x86
+		{C84DB9D2-D040-4B61-B56F-7AE53B3708F9}.Debug|x86.Build.0 = Debug|x86
+		{C84DB9D2-D040-4B61-B56F-7AE53B3708F9}.Release|x86.ActiveCfg = Release|x86
+		{C84DB9D2-D040-4B61-B56F-7AE53B3708F9}.Release|x86.Build.0 = Release|x86
+		{1B547910-6281-45AC-A21D-0FA7967249EC}.Debug|x86.ActiveCfg = Debug|x86
+		{1B547910-6281-45AC-A21D-0FA7967249EC}.Debug|x86.Build.0 = Debug|x86
+		{1B547910-6281-45AC-A21D-0FA7967249EC}.Release|x86.ActiveCfg = Release|x86
+		{1B547910-6281-45AC-A21D-0FA7967249EC}.Release|x86.Build.0 = Release|x86
+		{6D75187A-BE36-4AB3-8303-49B38DB04403}.Debug|x86.ActiveCfg = Debug|x86
+		{6D75187A-BE36-4AB3-8303-49B38DB04403}.Debug|x86.Build.0 = Debug|x86
+		{6D75187A-BE36-4AB3-8303-49B38DB04403}.Release|x86.ActiveCfg = Release|x86
+		{6D75187A-BE36-4AB3-8303-49B38DB04403}.Release|x86.Build.0 = Release|x86
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
