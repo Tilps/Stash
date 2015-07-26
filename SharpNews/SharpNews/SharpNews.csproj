@@ -1,0 +1,215 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.50727</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{1767AA8D-D1F0-4D70-A313-F745248C779A}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>SharpNews</RootNamespace>
+    <AssemblyName>SharpNews</AssemblyName>
+    <IsWebBootstrapper>true</IsWebBootstrapper>
+    <FileUpgradeFlags>
+    </FileUpgradeFlags>
+    <UpgradeBackupLocation>
+    </UpgradeBackupLocation>
+    <OldToolsVersion>3.5</OldToolsVersion>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <TargetFrameworkProfile />
+    <PublishUrl>http://localhost/SharpNews/</PublishUrl>
+    <Install>true</Install>
+    <InstallFrom>Web</InstallFrom>
+    <UpdateEnabled>true</UpdateEnabled>
+    <UpdateMode>Foreground</UpdateMode>
+    <UpdateInterval>7</UpdateInterval>
+    <UpdateIntervalUnits>Days</UpdateIntervalUnits>
+    <UpdatePeriodically>false</UpdatePeriodically>
+    <UpdateRequired>false</UpdateRequired>
+    <MapFileExtensions>true</MapFileExtensions>
+    <ApplicationRevision>0</ApplicationRevision>
+    <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
+    <UseApplicationTrust>false</UseApplicationTrust>
+    <BootstrapperEnabled>true</BootstrapperEnabled>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <DocumentationFile>bin\Debug\SharpNews.XML</DocumentationFile>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <DocumentationFile>bin\Release\SharpNews.XML</DocumentationFile>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.Deployment" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Web.Services" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Encoder\YEnc\YEncDecoder.cs" />
+    <Compile Include="GroupSettingsForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="GroupSettingsForm.Designer.cs">
+      <DependentUpon>GroupSettingsForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Main.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Main.Designer.cs">
+      <DependentUpon>Main.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Nntp\ArticleFollowsResponse.cs" />
+    <Compile Include="Nntp\ArticleFoundResponse.cs" />
+    <Compile Include="Nntp\ArticleMessage.cs" />
+    <Compile Include="Nntp\AuthenticationAcceptedResponse.cs" />
+    <Compile Include="Nntp\AuthInfoPasswordMessage.cs" />
+    <Compile Include="Nntp\AuthInfoUsernameMessage.cs" />
+    <Compile Include="Nntp\BodyFollowsResponse.cs" />
+    <Compile Include="Nntp\BodyMessage.cs" />
+    <Compile Include="Nntp\CapabilitiesMessage.cs" />
+    <Compile Include="Nntp\CapabilityListFollowsResponse.cs" />
+    <Compile Include="Nntp\CurrentArticleNumberInvalidResponse.cs" />
+    <Compile Include="Nntp\GroupDetailsResponse.cs" />
+    <Compile Include="Nntp\GroupMessage.cs" />
+    <Compile Include="Nntp\HeadersFollowResponse.cs" />
+    <Compile Include="Nntp\HeadMessage.cs" />
+    <Compile Include="Nntp\InformationFollowsResponse.cs" />
+    <Compile Include="Nntp\LastMessage.cs" />
+    <Compile Include="Nntp\ListGroupMessage.cs" />
+    <Compile Include="Nntp\ListMessage.cs" />
+    <Compile Include="Nntp\Message.cs" />
+    <Compile Include="Nntp\ModeReaderMessage.cs" />
+    <Compile Include="Nntp\NextMessage.cs" />
+    <Compile Include="Nntp\NntpConnection.cs" />
+    <Compile Include="Nntp\NoArticleWithMessageIdResponse.cs" />
+    <Compile Include="Nntp\NoArticleWithNumberResponse.cs" />
+    <Compile Include="Nntp\NoGroupSelectedResponse.cs" />
+    <Compile Include="Nntp\NoNextArticleResponse.cs" />
+    <Compile Include="Nntp\NoPreviousArticleResponse.cs" />
+    <Compile Include="Nntp\NoSuchGroupResponse.cs" />
+    <Compile Include="Nntp\PasswordRequiredResponse.cs" />
+    <Compile Include="Nntp\QuitMessage.cs" />
+    <Compile Include="Nntp\Response.cs" />
+    <Compile Include="NntpWorkhorse.cs" />
+    <Compile Include="Nntp\ServiceAvailableNoPostingResponse.cs" />
+    <Compile Include="Nntp\ServiceAvailableWithPostingResponse.cs" />
+    <Compile Include="Nntp\ServicePermanentlyUnavailableResponse.cs" />
+    <Compile Include="Nntp\ServiceTemporarilyUnavailableResponse.cs" />
+    <Compile Include="Nntp\StatMessage.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <EmbeddedResource Include="GroupSettingsForm.resx">
+      <DependentUpon>GroupSettingsForm.cs</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Main.resx">
+      <DependentUpon>Main.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="ServerSettingsForm.resx">
+      <DependentUpon>ServerSettingsForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+      <DesignTime>True</DesignTime>
+    </Compile>
+    <None Include="app.config" />
+    <None Include="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+    <None Include="ServerDataSet.xsc">
+      <DependentUpon>ServerDataSet.xsd</DependentUpon>
+    </None>
+    <None Include="ServerDataSet.xsd">
+      <Generator>MSDataSetGenerator</Generator>
+      <LastGenOutput>ServerDataSet.Designer.cs</LastGenOutput>
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="ServerDataSet.xss">
+      <DependentUpon>ServerDataSet.xsd</DependentUpon>
+    </None>
+    <Compile Include="Properties\Settings.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+    </Compile>
+    <Compile Include="ServerDataSet.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>ServerDataSet.xsd</DependentUpon>
+    </Compile>
+    <Compile Include="ServerSettings.cs" />
+    <Compile Include="ServerSettingsForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="ServerSettingsForm.Designer.cs">
+      <DependentUpon>ServerSettingsForm.cs</DependentUpon>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Server.mdf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Server_log.ldf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <DependentUpon>Server.mdf</DependentUpon>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <BootstrapperPackage Include="Microsoft.Net.Client.3.5">
+      <Visible>False</Visible>
+      <ProductName>.NET Framework 3.5 SP1 Client Profile</ProductName>
+      <Install>false</Install>
+    </BootstrapperPackage>
+    <BootstrapperPackage Include="Microsoft.Net.Framework.2.0">
+      <Visible>False</Visible>
+      <ProductName>.NET Framework 2.0 Beta</ProductName>
+      <Install>true</Install>
+    </BootstrapperPackage>
+    <BootstrapperPackage Include="Microsoft.Net.Framework.3.5.SP1">
+      <Visible>False</Visible>
+      <ProductName>.NET Framework 3.5 SP1</ProductName>
+      <Install>false</Install>
+    </BootstrapperPackage>
+    <BootstrapperPackage Include="Microsoft.Sql.Server.Express.1.0">
+      <Visible>False</Visible>
+      <ProductName>SQL Server 2005 Express Edition Beta</ProductName>
+      <Install>true</Install>
+    </BootstrapperPackage>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Compression\Rar\" />
+    <Folder Include="Compression\Zip\" />
+    <Folder Include="Integrity\Crc32\" />
+    <Folder Include="Integrity\Par\" />
+  </ItemGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+</Project>
