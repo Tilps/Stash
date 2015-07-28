@@ -1,0 +1,14 @@
+
+IMAGESIZE 500 500
+EYE 8 8 8
+VIEWAT 0 0 0
+VIEWUP 0 0 1
+FOCAL 4
+VIEWSIZE 4 4
+ANTIALIASING 5 0.0
+DIRECTIONAL 0 -1 -4 white
+DIRECTIONAL -2 4 -4 white
+DIRECTIONAL 2 4 -4 white
+DECAL white 0 0 0 0 0 0 width 3 length 3 image simontrans.ppm translucent_colour rgb:000000 END
+BRICK yellow 0 0 -2 0 0 0 width 2 length 2 END
+

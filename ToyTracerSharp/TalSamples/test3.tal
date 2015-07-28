@@ -1,0 +1,40 @@
+IMAGESIZE 500 500
+EYE 10 5 10
+VIEWAT 0 3 0
+VIEWUP 0 4 0
+FOCAL 1.5
+VIEWSIZE 2 2
+RECURSELIMITS 12 0.001
+ANTIALIASING 3 0.001
+
+POINTSOURCE 8 8 8 FFFFFF
+POINTSOURCE -8 8 8 FFFFFF
+
+ BRICK green 1.02 -6 0 -90 0 0 width 2 length 4 END
+ BRICK green -1 -6 0 -90 0 0 width 2 length 4  END
+ BRICK green -3.02 -6 0 -90 0 0 width 2 length 4 END
+
+ BRICK red 2 -4.8 -1 -90 90 0 width 2 length 4 END
+ BRICK white 2 -3.6 -1 -90 90 0 width 2 length 4  END
+ BRICK red 2 -2.4 -1 -90 90 0 width 2 length 4  END
+ BRICK white 2 -1.2 -1 -90 90 0 width 2 length 4 END
+ BRICK red 2 0 -1 -90 90 0 width 2 length 4  END
+ BRICK white 2 1.2 -1 -90 90 0 width 2 length 4  END
+ BRICK red 2 2.4 -1 -90 90 0 width 2 length 4 END
+ BRICK white 2 3.6 -1 -90 90 0 width 2 length 4  END
+ BRICK red 2 4.8 -1 -90 90 0 width 2 length 4  END
+
+ BRICK blue 1.02 6 0 -90 0 0 width 2 length 4 END
+ BRICK blue -1 6 0 -90 0 0 width 2 length 4  END
+ BRICK blue -3.02 6 0 -90 0 0 width 2 length 4 END
+
+ BRICK green -1 7.2 -1 -90 0 0 width 2 length 2 translucent END
+ BRICK green -1 8.42 -1 -90 0 0 width 2 length 2 translucent END
+
+ BRICK blue -2.01 9.62 -2.01 -90 0 0 width 2 length 2 END
+ BRICK blue -0.02 9.62 0.01 -90 0 0 width 2 length 2  END
+ BRICK blue -2.01 9.62 0.01 -90 0 0 width 2 length 2  END
+ BRICK blue 0.01 9.62 -2.01 -90 0 0 width 2 length 2  END
+
+ BRICK blue -1 10.82 -1 -90 0 0 width 2 length 2  END
+

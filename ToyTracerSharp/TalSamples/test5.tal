@@ -1,0 +1,13 @@
+
+IMAGESIZE 500 500
+EYE 0 0 8
+VIEWAT 0 0 0
+VIEWUP 0 1 0
+FOCAL 4
+VIEWSIZE 4 4
+DIRECTIONAL 0 -1 4 white
+DIRECTIONAL -2 4 4 white
+DIRECTIONAL 2 4 4 white
+PLATE green -1 1 1 210 45 0 width 3 length 3 END
+BRICK yellow 2 -0 -0 -30 0 30 width 2 length 2 END
+

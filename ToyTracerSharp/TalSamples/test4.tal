@@ -1,0 +1,16 @@
+IMAGESIZE 640 480
+EYE 6 10 4
+VIEWAT 0 0 0
+VIEWUP 0 0 1
+FOCAL 2.0
+VIEWSIZE 2 1.5
+RECURSELIMITS 12 0.00001 
+ANTIALIASING 2 0.01
+
+POINTSOURCE 10 10 10 rgb:aaaaaa
+
+BRICK yellow        0 0  1.2    0 0  0  width 2 length 4 translucent END
+BRICK rgb:c0e720    0 2  0.0    0 0 90  width 2 length 4 translucent END
+BRICK rgb:90b0ff    0 0 -1.2    0 0  0  width 2 length 4 translucent END
+
+

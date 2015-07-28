@@ -1,0 +1,20 @@
+IMAGESIZE 640 480
+EYE 3 10 4
+VIEWAT 0 0 0
+VIEWUP 0 0 1
+FOCAL 2.0
+VIEWSIZE 2 1.5
+RECURSELIMITS 12 0.00001
+ANTIALIASING 2 0.01
+
+POINTSOURCE 3 10 10 white
+
+# AXIS  red green blue
+
+BASEPLATE rgb:444444	-3 -1 -1.2 	0 0  0 	width 6 height 6 END
+
+BRICK rgb:4444ff	0 0 -1.2 	0 0  0 	width 2 length 4 translucent END
+BRICK rgb:aaff00	0 2  0.0 	0 0 90 	width 2 length 4 translucent END
+BRICK yellow 		0 0  1.2 	0 0  0 	width 2 length 4 translucent END
+TILE  red	 		0 2  2.4 	0 0 90 	width 2 length 4 translucent END
+

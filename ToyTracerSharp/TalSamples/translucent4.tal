@@ -1,0 +1,15 @@
+IMAGESIZE 640 480
+EYE 4 7 6
+VIEWAT 0 0 0
+VIEWUP 0 0 1
+FOCAL 2.0
+VIEWSIZE 2 1.5
+RECURSELIMITS 20 0.001
+# ANTIALIASING 2 0.01
+
+POINTSOURCE 0 10 10 white
+
+# AXIS  red green blue
+
+BRICK yellow 		0 0  0 	0 0  0 	width 2 length 4 translucent END
+
