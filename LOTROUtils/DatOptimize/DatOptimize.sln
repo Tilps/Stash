@@ -1,0 +1,26 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DatOptimize", "DatOptimize\DatOptimize.csproj", "{5673EAC7-BCB1-4770-B0B2-5FD9A8E0D71C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DatHash", "DatHash\DatHash.csproj", "{B50B1600-0D0C-4616-A674-E5953EB712BF}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x86 = Debug|x86
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5673EAC7-BCB1-4770-B0B2-5FD9A8E0D71C}.Debug|x86.ActiveCfg = Debug|x86
+		{5673EAC7-BCB1-4770-B0B2-5FD9A8E0D71C}.Debug|x86.Build.0 = Debug|x86
+		{5673EAC7-BCB1-4770-B0B2-5FD9A8E0D71C}.Release|x86.ActiveCfg = Release|x86
+		{5673EAC7-BCB1-4770-B0B2-5FD9A8E0D71C}.Release|x86.Build.0 = Release|x86
+		{B50B1600-0D0C-4616-A674-E5953EB712BF}.Debug|x86.ActiveCfg = Debug|x86
+		{B50B1600-0D0C-4616-A674-E5953EB712BF}.Debug|x86.Build.0 = Debug|x86
+		{B50B1600-0D0C-4616-A674-E5953EB712BF}.Release|x86.ActiveCfg = Release|x86
+		{B50B1600-0D0C-4616-A674-E5953EB712BF}.Release|x86.Build.0 = Release|x86
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
