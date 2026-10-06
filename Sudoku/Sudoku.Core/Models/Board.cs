@@ -5,6 +5,8 @@ using Sudoku.Core.Solver;
 
 namespace Sudoku.Core.Models;
 
+public record SolverProgress(int StepsCount, int LookaheadDepth, int Score, string CurrentAction);
+
 public class Board
 {
     private readonly int sizex;
@@ -64,14 +66,14 @@ public class Board
         cells[x, y] = value;
         if (value <= 0) return;
 
-        int cx = (x / sizex) * sizex;
-        int cy = (y / sizey) * sizey;
+        int cx = (x / sizey) * sizey;
+        int cy = (y / sizex) * sizex;
         for (int i = 0; i < width; i++)
         {
             possibles[i, y, value - 1] = false;
             possibles[x, i, value - 1] = false;
-            int tx = (i / sizey) + cx;
-            int ty = (i % sizey) + cy;
+            int tx = cx + (i / sizex);
+            int ty = cy + (i % sizex);
             possibles[tx, ty, value - 1] = false;
             possibles[x, y, i] = false;
         }
@@ -106,12 +108,16 @@ public class Board
         set => maxLookahead = value;
     }
 
-    private int maxScore;
-    public int Score => maxScore;
+    private int maxScore = 1;
+    public int Score => Math.Max(0, maxScore - 1);
 
     private int scoring;
     private int highTuples;
     public int HighTuples => highTuples;
+
+    public string DifficultyRating => (lastLookaheadUsed != 1)
+        ? lastLookaheadUsed.ToString()
+        : $"{lastLookaheadUsed}.{Score}.{highTuples}";
 
     private readonly List<int> lastxs = new();
     private readonly List<int> lastys = new();
@@ -135,13 +141,15 @@ public class Board
 
     /// <summary>
     /// Applies zeroth-order logical deductions (Naked Singles and Hidden Singles).
+    /// Prevents duplicate deductions across rows/columns/boxes within the same pass.
     /// </summary>
-    private SolveState PassZeroSlow(List<DeductionStep>? structuredSteps = null)
+    public SolveState PassZeroSlow(List<DeductionStep>? structuredSteps = null)
     {
         SolveState result = SolveState.MultipleSolutions;
         List<int> xs = new();
         List<int> ys = new();
         List<int> values = new();
+        HashSet<(int r, int c)> deducedCells = new();
         bool unsolvable = false;
 
         // 1. Naked Singles
@@ -156,21 +164,21 @@ public class Board
                     {
                         if (possibles[i, j, k])
                         {
-                            if (value == -1)
-                                value = k;
-                            else
-                                value = -2;
+                            if (value == -1) value = k;
+                            else value = -2;
                         }
                     }
                     if (value == -1)
                     {
                         unsolvable = true;
                     }
-                    if (value >= 0)
+                    else if (value >= 0)
                     {
                         xs.Add(i);
                         ys.Add(j);
                         values.Add(value + 1);
+                        deducedCells.Add((i, j));
+
                         if (UseLogging)
                         {
                             log.AppendFormat("{0} only possible in {1},{2}\n", value + 1, i, j);
@@ -183,7 +191,7 @@ public class Board
                                 Col: j,
                                 Value: value + 1,
                                 Type: DeductionType.NakedSingle,
-                                Explanation: $"Cell R{i + 1}C{j + 1} must be {value + 1}: it is the only remaining valid candidate for this cell.",
+                                Explanation: $"Cell R{i + 1}C{j + 1} must be {FormatValue(value + 1)}: it is the only remaining valid candidate for this cell.",
                                 GroupDescription: $"Cell R{i + 1}C{j + 1}"
                             ));
                         }
@@ -202,8 +210,8 @@ public class Board
                 int cid = -1;
                 int oxid = -1;
                 int oyid = -1;
-                int cx = (j / sizex) * sizex;
-                int cy = (j % sizex) * sizey;
+                int cx = (j / sizey) * sizey;
+                int cy = (j % sizey) * sizex;
 
                 for (int k = 0; k < width; k++)
                 {
@@ -217,8 +225,8 @@ public class Board
                         if (cid == -1) cid = k;
                         else cid = -2;
                     }
-                    int tx = (k / sizey) + cx;
-                    int ty = (k % sizey) + cy;
+                    int tx = cx + (k / sizex);
+                    int ty = cy + (k % sizex);
                     if (possibles[tx, ty, i])
                     {
                         if (oxid == -1) { oxid = tx; oyid = ty; }
@@ -234,7 +242,8 @@ public class Board
 
                 int valToPlace = i + 1;
 
-                if (rid != -2 && cells[j, rid] == 0)
+                // Hidden single in row j, column rid:
+                if (rid != -2 && cells[j, rid] == 0 && deducedCells.Add((j, rid)))
                 {
                     xs.Add(j);
                     ys.Add(rid);
@@ -251,14 +260,15 @@ public class Board
                             Col: rid,
                             Value: valToPlace,
                             Type: DeductionType.HiddenSingleRow,
-                            Explanation: $"Place {valToPlace} at R{j + 1}C{rid + 1}: within Row {j + 1}, {valToPlace} cannot go anywhere else.",
+                            Explanation: $"Place {FormatValue(valToPlace)} at R{j + 1}C{rid + 1}: within Row {j + 1}, {FormatValue(valToPlace)} cannot go anywhere else.",
                             GroupDescription: $"Row {j + 1}"
                         ));
                     }
                     result = SolveState.Progressing;
                 }
 
-                if (cid != -2 && cells[cid, j] == 0)
+                // Hidden single in col j, row cid:
+                if (cid != -2 && cells[cid, j] == 0 && deducedCells.Add((cid, j)))
                 {
                     xs.Add(cid);
                     ys.Add(j);
@@ -275,14 +285,15 @@ public class Board
                             Col: j,
                             Value: valToPlace,
                             Type: DeductionType.HiddenSingleColumn,
-                            Explanation: $"Place {valToPlace} at R{cid + 1}C{j + 1}: within Column {j + 1}, {valToPlace} cannot go anywhere else.",
+                            Explanation: $"Place {FormatValue(valToPlace)} at R{cid + 1}C{j + 1}: within Column {j + 1}, {FormatValue(valToPlace)} cannot go anywhere else.",
                             GroupDescription: $"Column {j + 1}"
                         ));
                     }
                     result = SolveState.Progressing;
                 }
 
-                if (oxid != -2 && cells[oxid, oyid] == 0)
+                // Hidden single in box j, cell (oxid, oyid):
+                if (oxid != -2 && cells[oxid, oyid] == 0 && deducedCells.Add((oxid, oyid)))
                 {
                     xs.Add(oxid);
                     ys.Add(oyid);
@@ -293,14 +304,14 @@ public class Board
                     }
                     if (structuredSteps != null)
                     {
-                        int boxNum = (oxid / sizex) * sizex + (oyid / sizey) + 1;
+                        int boxNum = j + 1;
                         structuredSteps.Add(new DeductionStep(
                             StepNumber: structuredSteps.Count + 1,
                             Row: oxid,
                             Col: oyid,
                             Value: valToPlace,
                             Type: DeductionType.HiddenSingleBox,
-                            Explanation: $"Place {valToPlace} at R{oxid + 1}C{oyid + 1}: within Box {boxNum}, {valToPlace} cannot go anywhere else.",
+                            Explanation: $"Place {FormatValue(valToPlace)} at R{oxid + 1}C{oyid + 1}: within Box {boxNum}, {FormatValue(valToPlace)} cannot go anywhere else.",
                             GroupDescription: $"Box {boxNum}"
                         ));
                     }
@@ -411,6 +422,8 @@ public class Board
                             {
                                 if (scoring != 0)
                                 {
+                                    var proofChain = new List<string>();
+
                                     if (UseLogging)
                                     {
                                         for (int a = 0; a < xs.Count; a++)
@@ -489,13 +502,15 @@ public class Board
                                                 log.AppendFormat("Trial ({0},{1} {2}):\n", xs[a], ys[a], values[a] + 1);
                                                 for (int b = 0; b < peggedxs.Count; b++)
                                                 {
+                                                    string chainEntry = $"Step {peggedwhen[b]}: R{peggedxs[b] + 1}C{peggedys[b] + 1}={FormatValue(peggedvs[b])}";
+                                                    proofChain.Add(chainEntry);
                                                     log.AppendFormat(" {3}: {0}, {1} {2}\n", peggedxs[b], peggedys[b], peggedvs[b], peggedwhen[b]);
                                                 }
                                             }
                                         }
                                     }
 
-                                    if (structuredSteps != null)
+                                    if (structuredSteps != null && possibles[i, j, k])
                                     {
                                         structuredSteps.Add(new DeductionStep(
                                             StepNumber: structuredSteps.Count + 1,
@@ -503,8 +518,9 @@ public class Board
                                             Col: j,
                                             Value: k + 1,
                                             Type: DeductionType.LookaheadElimination,
-                                            Explanation: $"Eliminated {k + 1} from R{i + 1}C{j + 1}: testing branching assumptions demonstrates {k + 1} is impossible here.",
-                                            GroupDescription: $"Lookahead deduction"
+                                            Explanation: $"Eliminated candidate {FormatValue(k + 1)} from R{i + 1}C{j + 1}: branching logic demonstrates {FormatValue(k + 1)} leads to contradiction.",
+                                            GroupDescription: $"Lookahead Depth {lookahead}",
+                                            ProofChain: proofChain.Count > 0 ? proofChain : null
                                         ));
                                     }
 
@@ -562,8 +578,8 @@ public class Board
                 {
                     if (possibles[k, j, i])
                     {
-                        columnSpots.Add(k);
                         rowSpots.Add(j);
+                        columnSpots.Add(k);
                         values.Add(i);
                     }
                 }
@@ -580,12 +596,12 @@ public class Board
 
                 // Box check
                 rowSpots.Clear(); columnSpots.Clear(); values.Clear();
-                int cx = (j / sizex) * sizex;
-                int cy = (j % sizex) * sizey;
+                int cx = (j / sizey) * sizey;
+                int cy = (j % sizey) * sizex;
                 for (int k = 0; k < width; k++)
                 {
-                    int tx = (k / sizey) + cx;
-                    int ty = (k % sizey) + cy;
+                    int tx = cx + (k / sizex);
+                    int ty = cy + (k % sizex);
                     if (possibles[tx, ty, i])
                     {
                         columnSpots.Add(tx);
@@ -635,8 +651,9 @@ public class Board
 
     /// <summary>
     /// Solves the puzzle using logical deductions, records minimized explanation steps, and rates difficulty.
+    /// Supports cooperative yielding and cancellation.
     /// </summary>
-    public SudokuSolution SolveWithRating()
+    public async Task<SudokuSolution> SolveWithRatingAsync(IProgress<SolverProgress>? progress = null, CancellationToken cancellationToken = default)
     {
         var sw = Stopwatch.StartNew();
         int[,] initial = (int[,])cells.Clone();
@@ -648,8 +665,17 @@ public class Board
         highTuples = 0;
 
         SolveState result = SolveState.Progressing;
+        int passCount = 0;
+
         while (result == SolveState.Progressing)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            if ((++passCount % 5) == 0)
+            {
+                progress?.Report(new SolverProgress(structuredSteps.Count, lastLookaheadUsed, Score, "Evaluating deductions..."));
+                await Task.Yield();
+            }
+
             result = PassZeroSlow(structuredSteps);
             if (result == SolveState.MultipleSolutions && Full)
             {
@@ -659,6 +685,7 @@ public class Board
             int counter = 0;
             while (result == SolveState.MultipleSolutions && counter < maxLookahead)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 scoring = 1;
                 int max = counter > 0 ? 2 : width * width + 1;
 
@@ -708,11 +735,16 @@ public class Board
             SolvedGrid: (int[,])cells.Clone(),
             Steps: structuredSteps,
             MaxLookaheadUsed: lastLookaheadUsed,
-            Score: maxScore,
+            Score: Score,
             HighTuples: highTuples,
             Elapsed: sw.Elapsed,
             FullLog: Log
         );
+    }
+
+    public SudokuSolution SolveWithRating(CancellationToken cancellationToken = default)
+    {
+        return SolveWithRatingAsync(null, cancellationToken).GetAwaiter().GetResult();
     }
 
     /// <summary>
@@ -723,7 +755,7 @@ public class Board
         var sw = Stopwatch.StartNew();
         int[,] initial = (int[,])cells.Clone();
 
-        var dl = new SudokuDancingLinks(sizey, sizex);
+        var dl = new SudokuDancingLinks(sizex, sizey);
         dl.SetGrid(initial);
         dl.Solve();
 
@@ -778,27 +810,84 @@ public class Board
         return b;
     }
 
+    /// <summary>
+    /// Parses any Sudoku board: flat strings (81 / 36 / 256 chars), or formatted multi-line ASCII drawings with |, +, -, spaces.
+    /// Supports values 1-9 and letters A-G for boards up to 16x16.
+    /// </summary>
     public static Board Parse(string input, int sizex = 3, int sizey = 3)
     {
         var board = new Board(sizex, sizey);
         int width = sizex * sizey;
 
-        // Clean out formatting characters like |, +, -, whitespace
-        string clean = Regex.Replace(input, @"[^\d\.]", "");
-        if (clean.Length >= width * width)
+        // Split by lines to check for multi-line ASCII format
+        string[] rawLines = input.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+        var contentLines = new List<string>();
+
+        foreach (var line in rawLines)
         {
-            for (int i = 0; i < width * width; i++)
+            string trimmed = line.Trim();
+            // Ignore horizontal divider lines like "---+---+---" or "===+===+==="
+            if (trimmed.Length > 0 && trimmed.All(ch => ch is '-' or '+' or '=' or '_' or ' '))
+                continue;
+            contentLines.Add(line);
+        }
+
+        if (contentLines.Count == width)
+        {
+            // Multi-line line-by-line parsing
+            for (int r = 0; r < width; r++)
             {
-                char ch = clean[i];
-                int r = i / width;
-                int c = i % width;
-                if (char.IsDigit(ch) && ch != '0')
+                int c = 0;
+                string line = contentLines[r];
+                for (int i = 0; i < line.Length && c < width; i++)
                 {
-                    board.Set(r, c, ch - '0');
+                    char ch = line[i];
+                    if (ch is '|' or '+' or '-' or ' ' or '\t') continue;
+                    int val = ParseValue(ch);
+                    if (val > 0 && val <= width)
+                    {
+                        board.Set(r, c, val);
+                    }
+                    c++;
                 }
             }
+            return board;
         }
+
+        // Fallback: continuous character stream
+        int cellIndex = 0;
+        for (int i = 0; i < input.Length && cellIndex < width * width; i++)
+        {
+            char ch = input[i];
+            if (ch is '|' or '+' or '-' or '=' or '_' or ' ' or '\t' or '\r' or '\n') continue;
+
+            int r = cellIndex / width;
+            int c = cellIndex % width;
+            int val = ParseValue(ch);
+
+            if (val > 0 && val <= width)
+            {
+                board.Set(r, c, val);
+            }
+            cellIndex++;
+        }
+
         return board;
+    }
+
+    public static string FormatValue(int value)
+    {
+        if (value <= 0) return ".";
+        if (value < 10) return value.ToString();
+        return ((char)('A' + value - 10)).ToString();
+    }
+
+    public static int ParseValue(char ch)
+    {
+        if (ch is '.' or '0') return 0;
+        if (char.IsDigit(ch)) return ch - '0';
+        if (char.IsLetter(ch)) return char.ToUpperInvariant(ch) - 'A' + 10;
+        return 0;
     }
 
     public string ToSimpleString()
@@ -808,9 +897,35 @@ public class Board
         {
             for (int c = 0; c < width; c++)
             {
-                sb.Append(cells[r, c] == 0 ? "." : cells[r, c].ToString());
+                sb.Append(FormatValue(cells[r, c]));
             }
         }
         return sb.ToString();
     }
+
+    public string ToAsciiString()
+    {
+        var sb = new StringBuilder();
+        for (int i = 0; i < width; i++)
+        {
+            if (i > 0 && i % sizey == 0)
+            {
+                for (int j = 0; j < width; j++)
+                {
+                    if (j > 0 && j % sizex == 0) sb.Append('+');
+                    sb.Append('-');
+                }
+                sb.AppendLine();
+            }
+
+            for (int j = 0; j < width; j++)
+            {
+                if (j > 0 && j % sizex == 0) sb.Append('|');
+                sb.Append(FormatValue(cells[i, j]));
+            }
+            sb.AppendLine();
+        }
+        return sb.ToString();
+    }
 }
+

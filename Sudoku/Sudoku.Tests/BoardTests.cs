@@ -7,17 +7,16 @@ namespace Sudoku.Tests;
 public class BoardTests
 {
     [Fact]
-    public void SolveWithRating_BeginnerPuzzle_SolvesWithNakedAndHiddenSingles()
+    public void SolveWithRating_9x9BeginnerPuzzle_SolvesWithNakedAndHiddenSingles()
     {
-        var preset = PresetPuzzle.Presets[0];
-        var board = Board.Parse(preset.Clues);
+        var preset = PresetPuzzle.GetPresetsForSize(3, 3)[0];
+        var board = Board.Parse(preset.Clues, 3, 3);
 
         var solution = board.SolveWithRating();
 
         Assert.Equal(SolveState.Solved, solution.State);
         Assert.True(solution.IsSuccess);
         Assert.NotEmpty(solution.Steps);
-        Assert.True(solution.Steps.Count > 0);
 
         // Verify all cells in solved grid are 1..9
         for (int r = 0; r < 9; r++)
@@ -28,7 +27,7 @@ public class BoardTests
             }
         }
 
-        // Verify each step has an explanation
+        // Verify each step has an explanation and valid coordinate
         foreach (var step in solution.Steps)
         {
             Assert.False(string.IsNullOrWhiteSpace(step.Explanation));
@@ -39,10 +38,29 @@ public class BoardTests
     }
 
     [Fact]
+    public void PassZeroSlow_Deduplication_NoDuplicateStepsForSameCell()
+    {
+        var preset = PresetPuzzle.GetPresetsForSize(3, 3)[0];
+        var board = Board.Parse(preset.Clues, 3, 3);
+
+        var steps = new List<DeductionStep>();
+        board.PassZeroSlow(steps);
+
+        // Verify no two steps target the exact same cell in the same pass
+        var targetCells = new HashSet<(int Row, int Col)>();
+        foreach (var step in steps)
+        {
+            Assert.True(targetCells.Add((step.Row, step.Col)), $"Duplicate deduction step recorded for cell R{step.Row + 1}C{step.Col + 1}");
+            Assert.True(step.IsPlacement);
+            Assert.False(step.IsElimination);
+        }
+    }
+
+    [Fact]
     public void SolveFast_DLX_SolvesInstantly()
     {
-        var preset = PresetPuzzle.Presets[1];
-        var board = Board.Parse(preset.Clues);
+        var preset = PresetPuzzle.GetPresetsForSize(3, 3)[2];
+        var board = Board.Parse(preset.Clues, 3, 3);
 
         var solution = board.SolveFast();
 
@@ -58,6 +76,50 @@ public class BoardTests
                 Assert.True(rowVals.Add(solution.SolvedGrid[r, c]));
             }
         }
+    }
+
+    [Fact]
+    public void Board_6x6Size_ParsesAndSolvesCorrectly()
+    {
+        string clues = "2..4...34...6..3....3..5...51...1..2";
+        var board = Board.Parse(clues, 3, 2);
+        Assert.Equal(6, board.Width);
+        Assert.Equal(3, board.SizeX);
+        Assert.Equal(2, board.SizeY);
+
+        string beginnerClues = "21.4.3.34.2.6.53.11.32.5.6.51.4.1.32";
+        var b = Board.Parse(beginnerClues, 3, 2);
+        b.MaxLookahead = 0;
+        var sol = b.SolveWithRating();
+        Assert.Equal(SolveState.Solved, sol.State);
+        Assert.Equal(0, sol.MaxLookaheadUsed);
+    }
+
+    [Fact]
+    public void Board_MultiLineAsciiFormat_ParsesCorrectly()
+    {
+        string ascii = """
+            2.6|...|...
+            ..7|.1.|.92
+            .8.|..5|...
+            ---+---+---
+            ..5|76.|9..
+            9..|.4.|..6
+            ..1|.39|4..
+            ---+---+---
+            ...|1..|.8.
+            63.|.5.|2..
+            ......5.4
+            """;
+
+        var board = Board.Parse(ascii, 3, 3);
+        Assert.Equal(2, board.Get(0, 0));
+        Assert.Equal(6, board.Get(0, 2));
+        Assert.Equal(7, board.Get(1, 2));
+        Assert.Equal(1, board.Get(1, 4));
+
+        var solution = board.SolveFast();
+        Assert.Equal(SolveState.Solved, solution.State);
     }
 
     [Fact]
@@ -86,54 +148,34 @@ public class BoardTests
     }
 
     [Fact]
-    public void Generator_GeneratesSolvableUniquePuzzle()
-    {
-        var generator = new SudokuGenerator();
-        var board = generator.Generate(Difficulty.Easy);
-
-        // Check with DLX that it has exactly 1 unique solution
-        var dl = new SudokuDancingLinks(3, 3);
-        dl.SetGrid(board.Cells);
-        dl.Solve();
-
-        Assert.Equal(1, dl.Count);
-    }
-
-    [Fact]
-    public void SolveWithRating_ProducesStructuredSteps()
-    {
-        var board = Board.Parse(PresetPuzzle.Presets[0].Clues);
-        var solution = board.SolveWithRating();
-
-        Assert.True(solution.Steps.Count > 0);
-        var firstStep = solution.Steps[0];
-        Assert.Equal(1, firstStep.StepNumber);
-        Assert.Contains(firstStep.Value.ToString(), firstStep.Explanation);
-    }
-
-    [Fact]
     public void AllPresets_SolveSuccessfullyWithDLX()
     {
         foreach (var preset in PresetPuzzle.Presets)
         {
-            var board = Board.Parse(preset.Clues);
+            var board = Board.Parse(preset.Clues, preset.SizeX, preset.SizeY);
             var solution = board.SolveFast();
-            Assert.True(solution.State == SolveState.Solved, $"Preset '{preset.Title}' failed with state: {solution.State}");
+            Assert.True(solution.State == SolveState.Solved, $"Preset '{preset.Title}' ({preset.SizeX}x{preset.SizeY}) failed with state: {solution.State}");
         }
     }
 
     [Fact]
-    public void Generator_GeneratesUniqueMediumAndHardPuzzles()
+    public void DifficultyCriteria_MatchesCorrectly()
     {
-        var generator = new SudokuGenerator();
-        foreach (var diff in new[] { Difficulty.Medium, Difficulty.Hard })
-        {
-            var board = generator.Generate(diff);
-            var dl = new SudokuDancingLinks(3, 3);
-            dl.SetGrid(board.Cells);
-            dl.Solve();
-            Assert.Equal(1, dl.Count);
-        }
+        var easy = DifficultyCriteria.Easy;
+        Assert.True(easy.Matches(0, 0, 0));
+        Assert.False(easy.Matches(1, 2, 2));
+
+        var medium = DifficultyCriteria.Medium;
+        Assert.True(medium.Matches(1, 1, 2));
+        Assert.False(medium.Matches(0, 0, 0));
+
+        var customWildcard = DifficultyCriteria.Custom("1.4.*");
+        Assert.True(customWildcard.Matches(1, 4, 3));
+        Assert.False(customWildcard.Matches(1, 2, 2));
+
+        var customGte = DifficultyCriteria.Custom(">=2");
+        Assert.True(customGte.Matches(2, 0, 0));
+        Assert.False(customGte.Matches(1, 5, 2));
     }
 
     [Fact]

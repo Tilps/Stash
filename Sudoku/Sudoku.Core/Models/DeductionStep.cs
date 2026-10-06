@@ -8,8 +8,18 @@ public sealed record DeductionStep(
     DeductionType Type,
     string Explanation,
     IReadOnlyList<(int Row, int Col)>? HighlightCells = null,
-    string? GroupDescription = null
+    string? GroupDescription = null,
+    IReadOnlyList<string>? ProofChain = null
 )
 {
     public string CellCoordinate => $"R{Row + 1}C{Col + 1}";
+
+    public bool IsPlacement => Type is DeductionType.NakedSingle
+        or DeductionType.HiddenSingleRow
+        or DeductionType.HiddenSingleColumn
+        or DeductionType.HiddenSingleBox
+        or DeductionType.DirectPlacement;
+
+    public bool IsElimination => !IsPlacement;
 }
+

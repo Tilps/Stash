@@ -11,6 +11,8 @@ public enum Difficulty
     Expert
 }
 
+public record GenerationProgress(int Attempt, int MaxAttempts, string LastRating, string Status);
+
 public class SudokuGenerator
 {
     private readonly int sizex;
@@ -26,48 +28,103 @@ public class SudokuGenerator
         this.rng = rng ?? new Random();
     }
 
-    public Board Generate(Difficulty difficulty = Difficulty.Medium)
+    public async Task<Board> GenerateAsync(
+        DifficultyCriteria criteria,
+        IProgress<GenerationProgress>? progress = null,
+        CancellationToken cancellationToken = default)
     {
-        int targetClues = difficulty switch
-        {
-            Difficulty.Easy => 38,
-            Difficulty.Medium => 32,
-            Difficulty.Hard => 28,
-            Difficulty.Expert => 24,
-            _ => 32
-        };
+        int targetClues = GetTargetClues(criteria);
+        int maxLookahead = criteria.ExactLookahead ?? 2;
+        int maxAttempts = (width > 9) ? 15 : 60;
+        Board? bestFallback = null;
 
-        int maxLookahead = difficulty switch
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            Difficulty.Easy => 0,
-            Difficulty.Medium => 1,
-            Difficulty.Hard => 2,
-            Difficulty.Expert => 3,
-            _ => 1
-        };
+            cancellationToken.ThrowIfCancellationRequested();
 
-        for (int attempt = 0; attempt < 20; attempt++)
-        {
-            var board = GenerateSymmetricPuzzle(targetClues, maxLookahead);
-            if (board != null)
+            progress?.Report(new GenerationProgress(
+                Attempt: attempt,
+                MaxAttempts: maxAttempts,
+                LastRating: bestFallback != null ? bestFallback.DifficultyRating : "None",
+                Status: $"Attempt {attempt}/{maxAttempts}: Generating puzzle candidate..."
+            ));
+
+            await Task.Yield();
+
+            var candidate = GenerateSymmetricPuzzle(targetClues);
+            if (candidate != null)
             {
-                return board;
+                bestFallback ??= candidate;
+
+                // Rate the candidate using the solver
+                var testBoard = candidate.Clone();
+                testBoard.MaxLookahead = Math.Max(2, maxLookahead);
+                var solution = await testBoard.SolveWithRatingAsync(cancellationToken: cancellationToken);
+
+                if (solution.IsSuccess)
+                {
+                    string rating = testBoard.DifficultyRating;
+                    progress?.Report(new GenerationProgress(
+                        Attempt: attempt,
+                        MaxAttempts: maxAttempts,
+                        LastRating: rating,
+                        Status: $"Attempt {attempt}: Rated as {rating}"
+                    ));
+
+                    if (criteria.Matches(testBoard.LastLookaheadUsed, testBoard.Score, testBoard.HighTuples))
+                    {
+                        return candidate;
+                    }
+                    else
+                    {
+                        // Keep best fallback based on lookahead closeness
+                        if (bestFallback == null || testBoard.LastLookaheadUsed > bestFallback.LastLookaheadUsed)
+                        {
+                            bestFallback = candidate;
+                        }
+                    }
+                }
             }
         }
 
-        // Fallback: return a well-formed puzzle if random generation timed out
-        return Board.Parse(PresetPuzzle.Presets[0].Clues, sizex, sizey);
+        // Return best fallback if difficulty match was not found within max attempts
+        return bestFallback ?? GenerateSymmetricPuzzle(targetClues) ?? PresetPuzzle.GetDefaultPreset(sizex, sizey);
     }
 
-    private Board? GenerateSymmetricPuzzle(int targetClues, int maxLookahead)
+    public Board Generate(Difficulty difficulty = Difficulty.Medium)
     {
-        var dl = new SudokuDancingLinks(sizey, sizex);
+        return Generate(DifficultyCriteria.FromDifficulty(difficulty));
+    }
+
+    public Board Generate(DifficultyCriteria criteria)
+    {
+        return GenerateAsync(criteria).GetAwaiter().GetResult();
+    }
+
+    private int GetTargetClues(DifficultyCriteria criteria)
+    {
+        // For 9x9: target 36 clues for easy down to 24 for expert
+        // Scale proportionally for other board sizes
+        double ratio = criteria.TargetPattern switch
+        {
+            "0" or "Easy" => 0.44,
+            "1.4+ / 2" or "Hard" => 0.32,
+            "2" or "Expert" => 0.28,
+            _ => 0.36
+        };
+
+        return Math.Max(width + 2, (int)(width * width * ratio));
+    }
+
+    private Board? GenerateSymmetricPuzzle(int targetClues)
+    {
+        var dl = new SudokuDancingLinks(sizex, sizey);
         List<int> xs = new();
         List<int> ys = new();
         List<int> values = new();
 
         int loops = 0;
-        int maxLoops = width * width * 10;
+        int maxLoops = width * width * 8;
 
         // Step 1: Add random symmetric pairs until puzzle has <= 1 solution
         while (loops++ < maxLoops)
@@ -148,11 +205,11 @@ public class SudokuGenerator
             puzzleGrid[oppR, oppC] = 0;
 
             dl.Clear();
-            for (int i = 0; i < width; i++)
+            for (int rr = 0; rr < width; rr++)
             {
-                for (int j = 0; j < width; j++)
+                for (int cc = 0; cc < width; cc++)
                 {
-                    dl.Grid[j, i] = puzzleGrid[i, j];
+                    dl.Grid[rr, cc] = puzzleGrid[rr, cc];
                 }
             }
             dl.Solve();
