@@ -121,11 +121,22 @@
                             bool isStepTarget = activeStep != null && activeStep.Row == row && activeStep.Col == col;
                             bool isStepGroup = activeStep != null && IsInStepGroup(activeStep, row, col) && !isStepTarget;
 
+                            // Interactive Forcing Chain highlights
+                            bool isChainSource = (selectedArrow != null && selectedArrow.FromRow == row && selectedArrow.FromCol == col)
+                                || (selectedChainStep != null && selectedChainStep.FromRow == row && selectedChainStep.FromCol == col);
+                            bool isChainTarget = (selectedArrow != null && selectedArrow.ToRow == row && selectedArrow.ToCol == col)
+                                || (selectedChainStep != null && selectedChainStep.ToRow == row && selectedChainStep.ToCol == col);
+                            var activeEnabling = selectedArrow?.EnablingCells ?? selectedChainStep?.EnablingCells;
+                            bool isChainEnabling = activeEnabling != null && activeEnabling.Any(c => c.Row == row && c.Col == col);
+
                             string cellClasses = "sudoku-cell";
                             if ((col + 1) % currentSizeX == 0 && (col + 1) < width) cellClasses += " border-right-thick";
                             if ((row + 1) % currentSizeY == 0 && (row + 1) < width) cellClasses += " border-bottom-thick";
 
                             if (isSelected) cellClasses += " selected";
+                            else if (isChainSource) cellClasses += " chain-source-cell";
+                            else if (isChainTarget) cellClasses += " chain-target-cell";
+                            else if (isChainEnabling) cellClasses += " chain-enabling-cell";
                             else if (isStepTarget) cellClasses += " step-affected-cell";
                             else if (isStepGroup) cellClasses += " step-affected-group";
                             else if (isMatchingNum) cellClasses += " matching-number";
@@ -192,31 +203,52 @@
 
                         @foreach (var arrow in activeStep.Arrows)
                         {
+                            bool isArrowSelected = (selectedArrow == arrow) ||
+                                (selectedChainStep != null && arrow.BranchIndex == selectedChainStep.BranchIndex && arrow.StepIndex == selectedChainStep.StepIndex);
+                            double arrowOpacity = (selectedArrow != null || selectedChainStep != null) ? (isArrowSelected ? 1.0 : 0.22) : 1.0;
+                            double arrowStrokeWidth = isArrowSelected ? 6.5 : 4.0;
                             var coords = ComputeArrowCoords(arrow.FromRow, arrow.FromCol, arrow.ToRow, arrow.ToCol);
                             string markerId = GetArrowMarkerId(arrow.Color);
 
-                            <line x1="@coords.X1" y1="@coords.Y1" x2="@coords.X2" y2="@coords.Y2"
-                                  stroke="@arrow.Color" stroke-width="4"
-                                  stroke-linecap="round"
-                                  stroke-dasharray="8,4"
-                                  marker-end="url(#@markerId)"
-                                  class="animated-arrow-line" />
+                            <g class="interactive-arrow-group" style="opacity: @arrowOpacity; transition: opacity 0.2s ease;">
+                                <!-- Hit target line for easy clicking -->
+                                <line x1="@coords.X1" y1="@coords.Y1" x2="@coords.X2" y2="@coords.Y2"
+                                      stroke="transparent" stroke-width="24"
+                                      style="pointer-events: stroke; cursor: pointer;"
+                                      @onclick="() => SelectArrow(arrow)"
+                                      @onclick:stopPropagation="true" />
 
-                            @if (!string.IsNullOrWhiteSpace(arrow.Label))
-                            {
-                                double mx = (coords.X1 + coords.X2) / 2.0;
-                                double my = (coords.Y1 + coords.Y2) / 2.0;
-                                double pillWidth = Math.Max(54.0, (arrow.Label.Length * 11.5) + 16.0);
-                                double pillHeight = 24.0;
-                                <g class="arrow-label-group">
-                                    <rect x="@(mx - pillWidth / 2.0)" y="@(my - pillHeight / 2.0)" width="@pillWidth" height="@pillHeight" rx="5"
-                                          fill="#0b1120" stroke="@arrow.Color" stroke-width="2" />
-                                    <text x="@mx" y="@(my + 1)" fill="#f8fafc" font-size="14" font-weight="700"
-                                          text-anchor="middle" dominant-baseline="middle">
-                                        @arrow.Label
-                                    </text>
-                                </g>
-                            }
+                                <!-- Visible arrow line -->
+                                <line x1="@coords.X1" y1="@coords.Y1" x2="@coords.X2" y2="@coords.Y2"
+                                      stroke="@arrow.Color" stroke-width="@arrowStrokeWidth"
+                                      stroke-linecap="round"
+                                      stroke-dasharray="@(isArrowSelected ? "none" : "8,4")"
+                                      marker-end="url(#@markerId)"
+                                      class="@(isArrowSelected ? "selected-arrow-line" : "animated-arrow-line")"
+                                      style="pointer-events: stroke; cursor: pointer;"
+                                      @onclick="() => SelectArrow(arrow)"
+                                      @onclick:stopPropagation="true" />
+
+                                @if (!string.IsNullOrWhiteSpace(arrow.Label))
+                                {
+                                    double mx = (coords.X1 + coords.X2) / 2.0;
+                                    double my = (coords.Y1 + coords.Y2) / 2.0;
+                                    double pillWidth = Math.Max(54.0, (arrow.Label.Length * 11.5) + 16.0);
+                                    double pillHeight = 24.0;
+                                    <g class="arrow-label-group" style="pointer-events: auto; cursor: pointer;"
+                                       @onclick="() => SelectArrow(arrow)"
+                                       @onclick:stopPropagation="true">
+                                        <rect x="@(mx - pillWidth / 2.0)" y="@(my - pillHeight / 2.0)" width="@pillWidth" height="@pillHeight" rx="5"
+                                              fill="@(isArrowSelected ? arrow.Color : "#0b1120")"
+                                              stroke="@(isArrowSelected ? "#ffffff" : arrow.Color)"
+                                              stroke-width="@(isArrowSelected ? 3 : 2)" />
+                                        <text x="@mx" y="@(my + 1)" fill="@(isArrowSelected ? "#0b1120" : "#f8fafc")" font-size="14" font-weight="700"
+                                              text-anchor="middle" dominant-baseline="middle">
+                                            @arrow.Label
+                                        </text>
+                                    </g>
+                                }
+                            </g>
                         }
                     </svg>
                 }
@@ -328,7 +360,85 @@
                                 @activeStep.Explanation
                             </p>
 
-                            @if (activeStep.ProofChain != null && activeStep.ProofChain.Count > 0)
+                            @if (activeStep.ChainSteps != null && activeStep.ChainSteps.Count > 0)
+                            {
+                                <div class="chain-walkthrough-container">
+                                    <div class="chain-walkthrough-header">
+                                        <span class="chain-header-title">🔗 Forcing Chain Links (Click to inspect)</span>
+                                        @if (selectedArrow != null || selectedChainStep != null)
+                                        {
+                                            <button class="btn-reset-selection" @onclick="ClearArrowSelection">Show All</button>
+                                        }
+                                    </div>
+
+                                    @if (selectedChainStep != null || selectedArrow != null)
+                                    {
+                                        var curStep = selectedChainStep;
+                                        var curArrow = selectedArrow;
+                                        int fromR = curStep?.FromRow ?? curArrow!.FromRow;
+                                        int fromC = curStep?.FromCol ?? curArrow!.FromCol;
+                                        int toR = curStep?.ToRow ?? curArrow!.ToRow;
+                                        int toC = curStep?.ToCol ?? curArrow!.ToCol;
+                                        var enabling = curStep?.EnablingCells ?? curArrow?.EnablingCells;
+
+                                        <div class="active-link-callout">
+                                            <div class="callout-header">
+                                                <span class="callout-badge">Selected Force</span>
+                                                <span class="callout-link-coords">R@(fromR + 1)C@(fromC + 1) ➔ R@(toR + 1)C@(toC + 1)</span>
+                                            </div>
+                                            @if (curStep != null && !string.IsNullOrWhiteSpace(curStep.Text))
+                                            {
+                                                <div class="callout-text">@curStep.Text</div>
+                                            }
+                                            @if (enabling != null && enabling.Count > 0)
+                                            {
+                                                <div class="callout-enabling">
+                                                    <span class="enabling-icon">⚡</span>
+                                                    <span><strong>Direct elimination peers:</strong> @string.Join(", ", enabling.Select(c => $"R{c.Row + 1}C{c.Col + 1}")) (highlighted in dashed purple outline on the grid)</span>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+
+                                    @{
+                                        var branchGroups = activeStep.ChainSteps.GroupBy(s => s.BranchIndex).OrderBy(g => g.Key);
+                                    }
+                                    @foreach (var group in branchGroups)
+                                    {
+                                        int branchIdx = group.Key;
+                                        string branchColor = GetBranchColor(branchIdx);
+                                        <div class="chain-branch-block" style="border-left-color: @branchColor;">
+                                            <div class="chain-branch-header" style="color: @branchColor;">
+                                                <span class="branch-dot" style="background: @branchColor;"></span>
+                                                <span>Branch #@(branchIdx + 1)</span>
+                                            </div>
+                                            <div class="chain-step-list">
+                                                @foreach (var step in group.OrderBy(s => s.StepIndex))
+                                                {
+                                                    bool isStepSelected = (selectedChainStep == step) ||
+                                                        (selectedArrow != null && selectedArrow.BranchIndex == step.BranchIndex && selectedArrow.StepIndex == step.StepIndex);
+                                                    <div class="chain-step-item @(isStepSelected ? "selected" : "")"
+                                                         @onclick="() => SelectChainStep(step)">
+                                                        <div class="chain-step-main">
+                                                            <span class="chain-step-badge" style="background: @(isStepSelected ? branchColor : "rgba(255,255,255,0.08)"); color: @(isStepSelected ? "#0f172a" : "#cbd5e1");">
+                                                                Link #@(step.StepIndex + 1)
+                                                            </span>
+                                                            <span class="chain-step-text">@step.Text</span>
+                                                        </div>
+                                                        @if (step.EnablingCells != null && step.EnablingCells.Count > 0)
+                                                        {
+                                                            <span class="chain-enabling-tag" title="Enabling peer eliminations">
+                                                                ⚡ @step.EnablingCells.Count peer@(step.EnablingCells.Count > 1 ? "s" : "")
+                                                            </span>
+                                                        }
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            else if (activeStep.ProofChain != null && activeStep.ProofChain.Count > 0)
                             {
                                 <div class="proof-chain-container">
                                     <div class="proof-chain-title">Contradiction Chain (@activeStep.ProofChain.Count steps):</div>
@@ -435,6 +545,9 @@
     private DeductionStep? activeStep => (currentSolution != null && currentStepIndex >= 0 && currentStepIndex < currentSolution.Steps.Count)
         ? currentSolution.Steps[currentStepIndex]
         : null;
+
+    private DeductionArrow? selectedArrow = null;
+    private ChainStepInfo? selectedChainStep = null;
 
     private bool isPlaying = false;
     private int playbackSpeedMs = 600;
@@ -954,10 +1067,55 @@
         _ => "badge-placement"
     };
 
+    private static readonly string[] branchPalette = new[]
+    {
+        "#38bdf8", // Sky blue
+        "#f59e0b", // Amber
+        "#10b981", // Emerald
+        "#a855f7", // Purple
+        "#ec4899", // Pink
+        "#06b6d4", // Cyan
+        "#eab308"  // Yellow
+    };
+
+    private string GetBranchColor(int branchIdx) => branchPalette[branchIdx % branchPalette.Length];
+
+    private void SelectArrow(DeductionArrow arrow)
+    {
+        if (selectedArrow == arrow)
+        {
+            selectedArrow = null;
+            selectedChainStep = null;
+            return;
+        }
+        selectedArrow = arrow;
+        selectedChainStep = activeStep?.ChainSteps?.FirstOrDefault(s => s.BranchIndex == arrow.BranchIndex && s.StepIndex == arrow.StepIndex);
+    }
+
+    private void SelectChainStep(ChainStepInfo step)
+    {
+        if (selectedChainStep == step)
+        {
+            selectedArrow = null;
+            selectedChainStep = null;
+            return;
+        }
+        selectedChainStep = step;
+        selectedArrow = activeStep?.Arrows?.FirstOrDefault(a => a.BranchIndex == step.BranchIndex && a.StepIndex == step.StepIndex);
+    }
+
+    private void ClearArrowSelection()
+    {
+        selectedArrow = null;
+        selectedChainStep = null;
+    }
+
     private void GoToStep(int index)
     {
         if (currentSolution == null) return;
         currentStepIndex = Math.Clamp(index, 0, currentSolution.Steps.Count - 1);
+        selectedArrow = null;
+        selectedChainStep = null;
         UpdatePlaybackSimulation();
 
         if (activeStep != null)

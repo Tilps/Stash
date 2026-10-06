@@ -11,7 +11,8 @@ public static class PatternClassifier
         string GroupDescription,
         IReadOnlyList<(int Row, int Col)> InvolvedCells,
         IReadOnlyList<DeductionArrow> Arrows,
-        IReadOnlyList<string>? ProofChain
+        IReadOnlyList<string>? ProofChain,
+        IReadOnlyList<ChainStepInfo>? ChainSteps = null
     );
 
     public static ClassificationResult Classify(
@@ -24,7 +25,8 @@ public static class PatternClassifier
         IReadOnlyList<int> branchVals,
         int lookaheadDepth,
         int scoring,
-        IReadOnlyList<string>? rawProofChain = null)
+        IReadOnlyList<string>? rawProofChain = null,
+        IReadOnlyList<IReadOnlyList<(int Row, int Col, int Val)>>? branchChains = null)
     {
         int width = board.Width;
         int sizex = board.SizeX;
@@ -59,7 +61,7 @@ public static class PatternClassifier
         if (swordfish != null) return swordfish;
 
         // 8. General Forcing Chain / Branching Logic
-        return BuildForcingChainResult(board, targetRow, targetCol, targetVal, branchRows, branchCols, branchVals, lookaheadDepth, scoring, rawProofChain);
+        return BuildForcingChainResult(board, targetRow, targetCol, targetVal, branchRows, branchCols, branchVals, lookaheadDepth, scoring, rawProofChain, branchChains);
     }
 
     private static ClassificationResult? CheckPointing(
@@ -613,42 +615,146 @@ public static class PatternClassifier
         IReadOnlyList<int> bVals,
         int lookaheadDepth,
         int scoring,
-        IReadOnlyList<string>? rawProofChain)
+        IReadOnlyList<string>? rawProofChain,
+        IReadOnlyList<IReadOnlyList<(int Row, int Col, int Val)>>? branchChains)
     {
-        var involved = new List<(int, int)> { (targetRow, targetCol) };
+        var involved = new HashSet<(int, int)> { (targetRow, targetCol) };
         for (int i = 0; i < bRows.Count; i++)
         {
             involved.Add((bRows[i], bCols[i]));
         }
 
         var arrows = new List<DeductionArrow>();
-        for (int i = 0; i < bRows.Count; i++)
+        var chainSteps = new List<ChainStepInfo>();
+        var proofChain = new List<string>();
+
+        string[] branchColors = new[] { "#38bdf8", "#f59e0b", "#10b981", "#a855f7", "#ec4899", "#06b6d4", "#eab308" };
+
+        for (int a = 0; a < bRows.Count; a++)
         {
-            arrows.Add(new DeductionArrow(
-                bRows[i],
-                bCols[i],
-                targetRow,
-                targetCol,
-                $"≠{Board.FormatValue(targetVal)}",
-                "#ef4444"
-            ));
+            string color = branchColors[a % branchColors.Length];
+            var chain = (branchChains != null && a < branchChains.Count) ? branchChains[a] : null;
+
+            int rootR = bRows[a];
+            int rootC = bCols[a];
+            int rootV = bVals[a] + 1;
+
+            if (chain != null && chain.Count > 1)
+            {
+                // Multi-step chain!
+                proofChain.Add($"Hypothesis {a + 1}: If R{rootR + 1}C{rootC + 1} = {Board.FormatValue(rootV)}:");
+
+                // Root step info
+                var rootEnabling = GetEnablingCells(board, rootR, rootC, chain[1].Row, chain[1].Col);
+                chainSteps.Add(new ChainStepInfo(
+                    BranchIndex: a,
+                    StepIndex: 0,
+                    Text: $"Assume R{rootR + 1}C{rootC + 1} = {Board.FormatValue(rootV)} ➔ Forces R{chain[1].Row + 1}C{chain[1].Col + 1} = {Board.FormatValue(chain[1].Val)}",
+                    FromRow: rootR,
+                    FromCol: rootC,
+                    ToRow: chain[1].Row,
+                    ToCol: chain[1].Col,
+                    ValueLabel: $"={Board.FormatValue(chain[1].Val)}",
+                    EnablingCells: rootEnabling
+                ));
+
+                // Intermediate forced steps
+                for (int b = 0; b < chain.Count - 1; b++)
+                {
+                    int fromR = chain[b].Row;
+                    int fromC = chain[b].Col;
+                    int toR = chain[b + 1].Row;
+                    int toC = chain[b + 1].Col;
+                    int toV = chain[b + 1].Val;
+
+                    involved.Add((fromR, fromC));
+                    involved.Add((toR, toC));
+
+                    var enabling = GetEnablingCells(board, fromR, fromC, toR, toC);
+                    arrows.Add(new DeductionArrow(
+                        fromR, fromC, toR, toC,
+                        $"={Board.FormatValue(toV)}",
+                        color,
+                        BranchIndex: a,
+                        StepIndex: b,
+                        EnablingCells: enabling
+                    ));
+
+                    if (b > 0)
+                    {
+                        chainSteps.Add(new ChainStepInfo(
+                            BranchIndex: a,
+                            StepIndex: b,
+                            Text: $"Forces R{toR + 1}C{toC + 1} = {Board.FormatValue(toV)} (via R{fromR + 1}C{fromC + 1})",
+                            FromRow: fromR,
+                            FromCol: fromC,
+                            ToRow: toR,
+                            ToCol: toC,
+                            ValueLabel: $"={Board.FormatValue(toV)}",
+                            EnablingCells: enabling
+                        ));
+                    }
+                    proofChain.Add($"   → Forces R{toR + 1}C{toC + 1} = {Board.FormatValue(toV)}");
+                }
+
+                // Final step from last forced cell to target cell
+                int lastR = chain[chain.Count - 1].Row;
+                int lastC = chain[chain.Count - 1].Col;
+                var finalEnabling = GetEnablingCells(board, lastR, lastC, targetRow, targetCol);
+
+                arrows.Add(new DeductionArrow(
+                    lastR, lastC, targetRow, targetCol,
+                    $"≠{Board.FormatValue(targetVal)}",
+                    color,
+                    BranchIndex: a,
+                    StepIndex: chain.Count - 1,
+                    EnablingCells: finalEnabling
+                ));
+
+                chainSteps.Add(new ChainStepInfo(
+                    BranchIndex: a,
+                    StepIndex: chain.Count - 1,
+                    Text: $"Forces R{lastR + 1}C{lastC + 1} = {Board.FormatValue(chain[chain.Count - 1].Val)} ➔ Eliminates {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}",
+                    FromRow: lastR,
+                    FromCol: lastC,
+                    ToRow: targetRow,
+                    ToCol: targetCol,
+                    ValueLabel: $"≠{Board.FormatValue(targetVal)}",
+                    EnablingCells: finalEnabling
+                ));
+                proofChain.Add($"   → Eliminates candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}");
+            }
+            else
+            {
+                // Direct hypothesis elimination (chainLength == 0 or 1-step)
+                var directEnabling = GetEnablingCells(board, rootR, rootC, targetRow, targetCol);
+                arrows.Add(new DeductionArrow(
+                    rootR, rootC, targetRow, targetCol,
+                    $"≠{Board.FormatValue(targetVal)}",
+                    color,
+                    BranchIndex: a,
+                    StepIndex: 0,
+                    EnablingCells: directEnabling
+                ));
+
+                proofChain.Add($"Hypothesis {a + 1}: If R{rootR + 1}C{rootC + 1} = {Board.FormatValue(rootV)}:");
+                proofChain.Add($"   → Eliminates candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}");
+
+                chainSteps.Add(new ChainStepInfo(
+                    BranchIndex: a,
+                    StepIndex: 0,
+                    Text: $"Assume R{rootR + 1}C{rootC + 1} = {Board.FormatValue(rootV)} ➔ Eliminates {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}",
+                    FromRow: rootR,
+                    FromCol: rootC,
+                    ToRow: targetRow,
+                    ToCol: targetCol,
+                    ValueLabel: $"≠{Board.FormatValue(targetVal)}",
+                    EnablingCells: directEnabling
+                ));
+            }
         }
 
-        List<string> proofChain;
-        if (rawProofChain != null && rawProofChain.Count > 0)
-        {
-            proofChain = rawProofChain.ToList();
-        }
-        else
-        {
-            proofChain = new List<string>();
-            for (int i = 0; i < bRows.Count; i++)
-            {
-                proofChain.Add($"Hypothesis {i + 1}: If R{bRows[i] + 1}C{bCols[i] + 1} = {Board.FormatValue(bVals[i] + 1)}:");
-                proofChain.Add($"   → Directly eliminates candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}");
-            }
-            proofChain.Add($"Conclusion: All {bRows.Count} hypotheses eliminate candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}.");
-        }
+        proofChain.Add($"Conclusion: All {bRows.Count} hypotheses eliminate candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}.");
 
         string branchesDesc = string.Join(" or ", bRows.Zip(bCols.Zip(bVals, (c, v) => (c, v)), (r, cv) => $"R{r + 1}C{cv.c + 1}={Board.FormatValue(cv.v + 1)}"));
         string expl = $"Forcing Chain: Evaluating all {bRows.Count} options ({branchesDesc}) proves candidate {Board.FormatValue(targetVal)} is impossible in R{targetRow + 1}C{targetCol + 1}.";
@@ -659,10 +765,70 @@ public static class PatternClassifier
             "Forcing Chain",
             expl,
             groupDesc,
-            involved,
+            involved.ToList(),
             arrows,
-            proofChain
+            proofChain,
+            chainSteps
         );
+    }
+
+    private static List<(int Row, int Col)> GetEnablingCells(Board board, int fromR, int fromC, int toR, int toC)
+    {
+        var result = new HashSet<(int Row, int Col)>();
+        int width = board.Width;
+        int sizex = board.SizeX;
+        int sizey = board.SizeY;
+
+        bool sameRow = (fromR == toR);
+        bool sameCol = (fromC == toC);
+        bool sameBox = (fromR / sizey == toR / sizey) && (fromC / sizex == toC / sizex);
+
+        if (sameRow)
+        {
+            for (int c = 0; c < width; c++)
+            {
+                if (c != fromC && c != toC && board.Get(fromR, c) == 0)
+                {
+                    result.Add((fromR, c));
+                }
+            }
+        }
+
+        if (sameCol)
+        {
+            for (int r = 0; r < width; r++)
+            {
+                if (r != fromR && r != toR && board.Get(r, fromC) == 0)
+                {
+                    result.Add((r, fromC));
+                }
+            }
+        }
+
+        if (sameBox)
+        {
+            int boxR = (fromR / sizey) * sizey;
+            int boxC = (fromC / sizex) * sizex;
+            for (int r = boxR; r < boxR + sizey; r++)
+            {
+                for (int c = boxC; c < boxC + sizex; c++)
+                {
+                    if ((r != fromR || c != fromC) && (r != toR || c != toC) && board.Get(r, c) == 0)
+                    {
+                        result.Add((r, c));
+                    }
+                }
+            }
+        }
+
+        // If not in a direct row, column or box, include intersection cells between them
+        if (!sameRow && !sameCol && !sameBox)
+        {
+            if (board.Get(fromR, toC) == 0) result.Add((fromR, toC));
+            if (board.Get(toR, fromC) == 0) result.Add((toR, fromC));
+        }
+
+        return result.ToList();
     }
 
     private static bool CanSee(Board board, int r1, int c1, int r2, int c2)

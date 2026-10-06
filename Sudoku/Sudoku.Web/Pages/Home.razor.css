@@ -261,6 +261,37 @@
     100% { transform: scale(1.02); box-shadow: inset 0 0 14px rgba(16, 185, 129, 0.9); }
 }
 
+/* Interactive Forcing Chain Cell Highlighting */
+.sudoku-cell.chain-source-cell {
+    background: rgba(56, 189, 248, 0.35) !important;
+    outline: 2px solid #38bdf8 !important;
+    z-index: 5;
+    animation: pulseSource 1.2s infinite alternate;
+}
+
+@keyframes pulseSource {
+    0% { box-shadow: inset 0 0 6px rgba(56, 189, 248, 0.6); }
+    100% { box-shadow: inset 0 0 16px rgba(56, 189, 248, 1); }
+}
+
+.sudoku-cell.chain-target-cell {
+    background: rgba(16, 185, 129, 0.35) !important;
+    outline: 2px solid #10b981 !important;
+    z-index: 5;
+    animation: pulseTarget 1.2s infinite alternate;
+}
+
+@keyframes pulseTarget {
+    0% { box-shadow: inset 0 0 6px rgba(16, 185, 129, 0.6); }
+    100% { box-shadow: inset 0 0 16px rgba(16, 185, 129, 1); }
+}
+
+.sudoku-cell.chain-enabling-cell {
+    background: rgba(168, 85, 247, 0.22) !important;
+    outline: 2px dashed #a855f7 !important;
+    z-index: 4;
+}
+
 /* Candidates Grid inside Cell */
 /* Candidates Grid inside Cell */
 .candidates-grid {
@@ -918,3 +949,199 @@
     outline: none;
     box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
 }
+
+/* Selected Arrow Line Highlight */
+::deep .selected-arrow-line,
+.selected-arrow-line {
+    filter: drop-shadow(0 0 7px rgba(255, 255, 255, 0.95)) !important;
+}
+
+/* Forcing Chain Links Walkthrough Panel */
+.chain-walkthrough-container {
+    margin-top: 0.75rem;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    max-height: 260px;
+    overflow-y: auto;
+}
+
+.chain-walkthrough-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.chain-header-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #38bdf8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.btn-reset-selection {
+    background: rgba(56, 189, 248, 0.15);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    border-radius: 4px;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-reset-selection:hover {
+    background: #38bdf8;
+    color: #0f172a;
+}
+
+.active-link-callout {
+    background: rgba(30, 41, 59, 0.95);
+    border: 1px solid #475569;
+    border-left: 3px solid #38bdf8;
+    border-radius: 6px;
+    padding: 0.55rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.callout-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.callout-badge {
+    background: #38bdf8;
+    color: #0f172a;
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    text-transform: uppercase;
+}
+
+.callout-link-coords {
+    font-family: monospace;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #f1f5f9;
+}
+
+.callout-text {
+    font-size: 0.8rem;
+    color: #cbd5e1;
+    font-family: monospace;
+}
+
+.callout-enabling {
+    font-size: 0.75rem;
+    color: #c084fc;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.35rem;
+    background: rgba(168, 85, 247, 0.12);
+    border-radius: 4px;
+    padding: 0.3rem 0.45rem;
+}
+
+.enabling-icon {
+    flex-shrink: 0;
+}
+
+.chain-branch-block {
+    border-left: 3px solid #38bdf8;
+    background: rgba(30, 41, 59, 0.5);
+    border-radius: 0 6px 6px 0;
+    padding: 0.45rem 0.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.chain-branch-header {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.branch-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.chain-step-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.chain-step-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.3rem 0.5rem;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.12s ease;
+}
+
+.chain-step-item:hover {
+    background: rgba(51, 65, 85, 0.6);
+    border-color: rgba(56, 189, 248, 0.4);
+}
+
+.chain-step-item.selected {
+    background: rgba(56, 189, 248, 0.2);
+    border-color: #38bdf8;
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.3);
+}
+
+.chain-step-main {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+.chain-step-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.chain-step-text {
+    font-size: 0.75rem;
+    color: #e2e8f0;
+    font-family: monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chain-enabling-tag {
+    font-size: 0.68rem;
+    color: #c084fc;
+    background: rgba(168, 85, 247, 0.15);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+

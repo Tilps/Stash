@@ -439,6 +439,7 @@ public class Board
                                 if (scoring != 0)
                                 {
                                     var proofChain = new List<string>();
+                                    var branchChains = new List<List<(int Row, int Col, int Val)>>();
 
                                     if (UseLogging)
                                     {
@@ -523,7 +524,14 @@ public class Board
                                                     proofChain.Add($"   → Forces R{peggedRows[b] + 1}C{peggedCols[b] + 1} = {FormatValue(peggedvs[b])}");
                                                     log.AppendFormat(" {3}: {0}, {1} {2}\n", peggedRows[b], peggedCols[b], peggedvs[b], peggedwhen[b]);
                                                 }
-                                                proofChain.Add($"   → Eliminates candidate {FormatValue(k + 1)} from R{i + 1}C{j + 1}");
+                                                 proofChain.Add($"   → Eliminates candidate {FormatValue(k + 1)} from R{i + 1}C{j + 1}");
+
+                                                var chain = new List<(int Row, int Col, int Val)>();
+                                                for (int b = 0; b < peggedRows.Count; b++)
+                                                {
+                                                    chain.Add((peggedRows[b], peggedCols[b], peggedvs[b]));
+                                                }
+                                                branchChains.Add(chain);
                                             }
                                             proofChain.Add($"Conclusion: All {branchRows.Count} hypotheses eliminate candidate {FormatValue(k + 1)} from R{i + 1}C{j + 1}.");
                                         }
@@ -531,6 +539,7 @@ public class Board
                                         {
                                             for (int a = 0; a < branchRows.Count; a++)
                                             {
+                                                branchChains.Add(new List<(int Row, int Col, int Val)> { (branchRows[a], branchCols[a], values[a] + 1) });
                                                 log.AppendFormat("Trial ({0},{1} {2}):\n", branchRows[a], branchCols[a], values[a] + 1);
                                                 proofChain.Add($"Hypothesis {a + 1}: If R{branchRows[a] + 1}C{branchCols[a] + 1} = {FormatValue(values[a] + 1)}:");
                                                 proofChain.Add($"   → Eliminates candidate {FormatValue(k + 1)} from R{i + 1}C{j + 1}");
@@ -549,22 +558,24 @@ public class Board
                                         values,
                                         lookaheadDepth: lookahead,
                                         scoring: scoring,
-                                        rawProofChain: proofChain.Count > 0 ? proofChain : null
+                                        rawProofChain: proofChain.Count > 0 ? proofChain : null,
+                                        branchChains: branchChains.Count > 0 ? branchChains : null
                                     );
 
                                     if (structuredSteps != null && possibles[i, j, k])
                                     {
                                         structuredSteps.Add(new DeductionStep(
-                                            StepNumber: structuredSteps.Count + 1,
-                                            Row: i,
-                                            Col: j,
-                                            Value: k + 1,
-                                            Type: classified.Type,
-                                            Explanation: classified.Explanation,
-                                            HighlightCells: classified.InvolvedCells,
-                                            GroupDescription: classified.GroupDescription,
-                                            ProofChain: classified.ProofChain,
-                                            Arrows: classified.Arrows
+                                             StepNumber: structuredSteps.Count + 1,
+                                             Row: i,
+                                             Col: j,
+                                             Value: k + 1,
+                                             Type: classified.Type,
+                                             Explanation: classified.Explanation,
+                                             HighlightCells: classified.InvolvedCells,
+                                             GroupDescription: classified.GroupDescription,
+                                             ProofChain: classified.ProofChain,
+                                             Arrows: classified.Arrows,
+                                             ChainSteps: classified.ChainSteps
                                         ));
                                     }
 
