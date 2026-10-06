@@ -50,6 +50,14 @@ public class Board
         return possibles[x, y, v - 1];
     }
 
+    public void SetCandidate(int x, int y, int v, bool possible)
+    {
+        if (v >= 1 && v <= width)
+        {
+            possibles[x, y, v - 1] = possible;
+        }
+    }
+
     public IReadOnlyList<int> GetCandidates(int x, int y)
     {
         if (cells[x, y] != 0) return Array.Empty<int>();

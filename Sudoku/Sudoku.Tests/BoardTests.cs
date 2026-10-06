@@ -374,4 +374,72 @@ public class BoardTests
         Assert.Equal(1, sol.Score);
         Assert.Equal(3, sol.HighTuples);
     }
+
+    [Fact]
+    public void Test_PatternClassifier_XYWing_ClassifiesWhenBackedByChains()
+    {
+        var board = new Board(3, 3);
+        // Setup bi-value cells:
+        // Pivot at R0C0 (0,0) with {1, 2}
+        // Pincer 1 at R0C5 (0,5) with {1, 9} (sees Pivot in Row 0)
+        // Pincer 2 at R4C0 (4,0) with {2, 9} (sees Pivot in Col 0)
+        // Target cell at R4C5 (4,5) with candidate 9 (sees Pincer 1 in Col 5 and Pincer 2 in Row 4)
+        for (int v = 3; v <= 8; v++) board.SetCandidate(0, 0, v, false); // Pivot has {1, 2}
+        for (int v = 2; v <= 8; v++) board.SetCandidate(0, 5, v, false); // Pincer 1 has {1, 9}
+        for (int v = 3; v <= 8; v++) board.SetCandidate(4, 0, v, false); // Pincer 2 has {2, 9}
+        board.SetCandidate(4, 0, 1, false);
+
+        var branchRows = new List<int> { 0, 0 };
+        var branchCols = new List<int> { 0, 0 };
+        var branchVals = new List<int> { 0, 1 }; // Values 1 and 2 (0-indexed 0 and 1)
+        var branchChains = new List<IReadOnlyList<(int Row, int Col, int Val)>>
+        {
+            new List<(int, int, int)> { (0, 0, 1), (0, 5, 9) },
+            new List<(int, int, int)> { (0, 0, 2), (4, 0, 9) }
+        };
+
+        var result = PatternClassifier.Classify(
+            board,
+            targetRow: 4, targetCol: 5, targetVal: 9,
+            branchRows, branchCols, branchVals,
+            lookaheadDepth: 1, scoring: 2,
+            branchChains: branchChains
+        );
+
+        Assert.Equal(DeductionType.XYWing, result.Type);
+        Assert.Equal("XY-Wing", result.Name);
+        Assert.Contains("Pivot R1C1", result.Explanation);
+    }
+
+    [Fact]
+    public void Test_PatternClassifier_UnbackedTrial_DoesNotMisclassify()
+    {
+        var board = new Board(3, 3);
+        // Pivot & pincers exist on the board as before
+        for (int v = 3; v <= 8; v++) board.SetCandidate(0, 0, v, false);
+        for (int v = 2; v <= 8; v++) board.SetCandidate(0, 5, v, false);
+        for (int v = 3; v <= 8; v++) board.SetCandidate(4, 0, v, false);
+        board.SetCandidate(4, 0, 1, false);
+
+        // BUT the trial deduction that was actually executed was at an unrelated cell R8C8!
+        var branchRows = new List<int> { 8, 8 };
+        var branchCols = new List<int> { 8, 8 };
+        var branchVals = new List<int> { 3, 4 };
+        var branchChains = new List<IReadOnlyList<(int Row, int Col, int Val)>>
+        {
+            new List<(int, int, int)> { (8, 8, 4) },
+            new List<(int, int, int)> { (8, 8, 5) }
+        };
+
+        var result = PatternClassifier.Classify(
+            board,
+            targetRow: 4, targetCol: 5, targetVal: 9,
+            branchRows, branchCols, branchVals,
+            lookaheadDepth: 1, scoring: 2,
+            branchChains: branchChains
+        );
+
+        // It must NOT misclassify as XY-Wing! It must report Forcing Chain.
+        Assert.Equal(DeductionType.ForcingChain, result.Type);
+    }
 }

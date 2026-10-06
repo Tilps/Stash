@@ -48,3 +48,4 @@ public sealed record DeductionStep(
 
     public bool IsElimination => !IsPlacement;
 }
+

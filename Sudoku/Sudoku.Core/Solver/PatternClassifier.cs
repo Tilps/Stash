@@ -40,27 +40,23 @@ public static class PatternClassifier
         var boxLine = CheckBoxLineReduction(board, targetRow, targetCol, targetVal, branchRows, branchCols, branchVals);
         if (boxLine != null) return boxLine;
 
-        // 3. Check Naked Pair / Triple / Quad
-        var naked = CheckNakedSubset(board, targetRow, targetCol, targetVal);
+        // 3. Check Naked Pair / Triple / Quad directly from trial branches & chains
+        var naked = CheckNakedSubset(board, targetRow, targetCol, targetVal, branchRows, branchCols, branchVals, branchChains);
         if (naked != null) return naked;
 
-        // 4. Check Hidden Pair / Triple
-        var hidden = CheckHiddenSubset(board, targetRow, targetCol, targetVal);
+        // 4. Check Hidden Pair / Triple directly from trial branches & chains
+        var hidden = CheckHiddenSubset(board, targetRow, targetCol, targetVal, branchRows, branchCols, branchVals, branchChains);
         if (hidden != null) return hidden;
 
-        // 5. Check X-Wing (2-Fish)
-        var xwing = CheckXWing(board, targetRow, targetCol, targetVal);
+        // 5. Check X-Wing (2-Fish) directly from trial branches & chains
+        var xwing = CheckXWing(board, targetRow, targetCol, targetVal, branchRows, branchCols, branchVals, branchChains);
         if (xwing != null) return xwing;
 
-        // 6. Check XY-Wing
-        var xywing = CheckXYWing(board, targetRow, targetCol, targetVal);
+        // 6. Check XY-Wing directly from trial branches & chains
+        var xywing = CheckXYWing(board, targetRow, targetCol, targetVal, branchRows, branchCols, branchVals, branchChains);
         if (xywing != null) return xywing;
 
-        // 7. Check Swordfish (3-Fish)
-        var swordfish = CheckSwordfish(board, targetRow, targetCol, targetVal);
-        if (swordfish != null) return swordfish;
-
-        // 8. General Forcing Chain / Branching Logic
+        // 7. General Forcing Chain / Branching Logic
         return BuildForcingChainResult(board, targetRow, targetCol, targetVal, branchRows, branchCols, branchVals, lookaheadDepth, scoring, rawProofChain, branchChains);
     }
 
@@ -191,72 +187,15 @@ public static class PatternClassifier
     }
 
 
-    private static ClassificationResult? CheckNakedSubset(Board board, int targetRow, int targetCol, int targetVal)
-    {
-        int width = board.Width;
-        int sizex = board.SizeX;
-        int sizey = board.SizeY;
-
-        // Check units: Row, Column, Box
-        var units = new (string Name, List<(int R, int C)> Cells)[]
-        {
-            ($"Row {targetRow + 1}", Enumerable.Range(0, width).Select(c => (targetRow, c)).ToList()),
-            ($"Column {targetCol + 1}", Enumerable.Range(0, width).Select(r => (r, targetCol)).ToList()),
-            ($"Box {(targetRow / sizey) * (width / sizex) + (targetCol / sizex) + 1}",
-                GetBoxCells(board, (targetRow / sizey) * sizey, (targetCol / sizex) * sizex))
-        };
-
-        foreach (var (unitName, unitCells) in units)
-        {
-            var emptyCells = unitCells.Where(cell => board.Get(cell.R, cell.C) == 0 && (cell.R != targetRow || cell.C != targetCol)).ToList();
-
-            for (int size = 2; size <= 4 && size <= emptyCells.Count; size++)
-            {
-                foreach (var combo in Combinations(emptyCells, size))
-                {
-                    var combinedCands = new HashSet<int>();
-                    bool allHaveAtLeastTwo = true;
-                    foreach (var c in combo)
-                    {
-                        var cands = board.GetCandidates(c.R, c.C);
-                        if (cands.Count < 2) { allHaveAtLeastTwo = false; break; }
-                        foreach (int cand in cands)
-                        {
-                            combinedCands.Add(cand);
-                        }
-                    }
-
-                    if (allHaveAtLeastTwo && combinedCands.Count == size && combinedCands.Contains(targetVal))
-                    {
-                        string subsetName = size switch
-                        {
-                            2 => "Naked Pair",
-                            3 => "Naked Triple",
-                            _ => "Naked Quad"
-                        };
-                        var dType = size switch
-                        {
-                            2 => DeductionType.NakedPair,
-                            3 => DeductionType.NakedTriple,
-                            _ => DeductionType.NakedQuad
-                        };
-
-                        var involved = combo.Concat(new[] { (targetRow, targetCol) }).ToList();
-                        var arrows = combo.Select(c => new DeductionArrow(c.R, c.C, targetRow, targetCol, null, "#10b981")).ToList();
-                        string cellsStr = string.Join(", ", combo.Select(c => $"R{c.R + 1}C{c.C + 1}"));
-                        string candsStr = "{" + string.Join(", ", combinedCands.OrderBy(v => v).Select(Board.FormatValue)) + "}";
-                        string expl = $"{subsetName}: Cells {cellsStr} in {unitName} are locked to candidates {candsStr}, eliminating candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}.";
-
-                        return new ClassificationResult(dType, subsetName, expl, $"{subsetName} in {unitName}", involved, arrows, null);
-                    }
-                }
-            }
-        }
-
-        return null;
-    }
-
-    private static ClassificationResult? CheckHiddenSubset(Board board, int targetRow, int targetCol, int targetVal)
+    private static ClassificationResult? CheckNakedSubset(
+        Board board,
+        int targetRow,
+        int targetCol,
+        int targetVal,
+        IReadOnlyList<int> bRows,
+        IReadOnlyList<int> bCols,
+        IReadOnlyList<int> bVals,
+        IReadOnlyList<IReadOnlyList<(int Row, int Col, int Val)>>? branchChains)
     {
         int width = board.Width;
         int sizex = board.SizeX;
@@ -270,46 +209,114 @@ public static class PatternClassifier
                 GetBoxCells(board, (targetRow / sizey) * sizey, (targetCol / sizex) * sizex))
         };
 
-        foreach (var (unitName, unitCells) in units)
+        // Scenario 1: Trial branches all test candidate targetVal in a unit containing targetCell
+        if (bVals.All(v => v == targetVal - 1) && bRows.Count >= 2 && bRows.Count <= 4)
         {
-            var targetCell = (targetRow, targetCol);
-            var emptyCells = unitCells.Where(c => board.Get(c.R, c.C) == 0).ToList();
-
-            for (int size = 2; size <= 3 && size <= emptyCells.Count; size++)
+            foreach (var (unitName, unitCells) in units)
             {
-                var candidateMap = new Dictionary<int, List<(int R, int C)>>();
-                for (int d = 1; d <= width; d++)
+                bool allInUnit = true;
+                for (int i = 0; i < bRows.Count; i++)
                 {
-                    if (d == targetVal) continue;
-                    var pos = emptyCells.Where(c => board.CheckPossible(c.R, c.C, d)).ToList();
-                    if (pos.Count >= 2 && pos.Count <= size && pos.Contains(targetCell))
+                    if (!unitCells.Any(c => c.R == bRows[i] && c.C == bCols[i]))
                     {
-                        candidateMap[d] = pos;
+                        allInUnit = false;
+                        break;
                     }
                 }
 
-                if (candidateMap.Count >= size)
+                if (allInUnit && !bRows.Zip(bCols, (r, c) => (r, c)).Contains((targetRow, targetCol)))
                 {
-                    foreach (var dCombo in Combinations(candidateMap.Keys.ToList(), size))
+                    var emptyCells = unitCells.Where(c => board.Get(c.R, c.C) == 0 && (c.R != targetRow || c.C != targetCol)).ToList();
+                    var trialCells = bRows.Zip(bCols, (r, c) => (r, c)).Distinct().ToList();
+
+                    for (int size = trialCells.Count; size <= 4 && size <= emptyCells.Count; size++)
                     {
-                        var cellsUnion = new HashSet<(int R, int C)>();
-                        foreach (var d in dCombo)
+                        foreach (var combo in Combinations(emptyCells, size))
                         {
-                            foreach (var cell in candidateMap[d]) cellsUnion.Add(cell);
+                            if (!trialCells.All(tc => combo.Contains(tc))) continue;
+
+                            var combinedCands = new HashSet<int>();
+                            bool valid = true;
+                            foreach (var c in combo)
+                            {
+                                var cands = board.GetCandidates(c.R, c.C);
+                                if (cands.Count < 2) { valid = false; break; }
+                                foreach (int cand in cands) combinedCands.Add(cand);
+                            }
+
+                            if (valid && combinedCands.Count == size && combinedCands.Contains(targetVal))
+                            {
+                                string subsetName = size switch
+                                {
+                                    2 => "Naked Pair",
+                                    3 => "Naked Triple",
+                                    _ => "Naked Quad"
+                                };
+                                var dType = size switch
+                                {
+                                    2 => DeductionType.NakedPair,
+                                    3 => DeductionType.NakedTriple,
+                                    _ => DeductionType.NakedQuad
+                                };
+
+                                var involved = combo.Concat(new[] { (targetRow, targetCol) }).ToList();
+                                var arrows = combo.Select(c => new DeductionArrow(c.R, c.C, targetRow, targetCol, $"locks {Board.FormatValue(targetVal)}", "#10b981")).ToList();
+                                string cellsStr = string.Join(", ", combo.Select(c => $"R{c.R + 1}C{c.C + 1}"));
+                                string candsStr = "{" + string.Join(", ", combinedCands.OrderBy(v => v).Select(Board.FormatValue)) + "}";
+                                string expl = $"{subsetName}: Cells {cellsStr} in {unitName} are locked to candidates {candsStr}, eliminating candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}.";
+
+                                return new ClassificationResult(dType, subsetName, expl, $"{subsetName} in {unitName}", involved, arrows, null);
+                            }
                         }
+                    }
+                }
+            }
+        }
 
-                        if (cellsUnion.Count == size && cellsUnion.Contains(targetCell))
+        // Scenario 2: Trial on a single cell A in unit, testing its candidates, which forces cell B in the unit to targetVal
+        if (bRows.Count == 2 && bRows[0] == bRows[1] && bCols[0] == bCols[1])
+        {
+            int rA = bRows[0];
+            int cA = bCols[0];
+            int v0 = bVals[0] + 1;
+            int v1 = bVals[1] + 1;
+
+            if (v0 == targetVal || v1 == targetVal)
+            {
+                int otherVal = (v0 == targetVal) ? v1 : v0;
+                int branchOtherIdx = (v0 == targetVal) ? 1 : 0;
+
+                if (branchChains != null && branchOtherIdx < branchChains.Count)
+                {
+                    foreach (var step in branchChains[branchOtherIdx].Skip(1))
+                    {
+                        if (step.Val == targetVal && (step.Row != rA || step.Col != cA))
                         {
-                            string subsetName = size == 2 ? "Hidden Pair" : "Hidden Triple";
-                            var dType = size == 2 ? DeductionType.HiddenPair : DeductionType.HiddenTriple;
+                            int rB = step.Row;
+                            int cB = step.Col;
 
-                            var involved = cellsUnion.ToList();
-                            var arrows = cellsUnion.Where(c => c != targetCell).Select(c => new DeductionArrow(c.R, c.C, targetRow, targetCol, null, "#ec4899")).ToList();
-                            string cellsStr = string.Join(", ", cellsUnion.Select(c => $"R{c.R + 1}C{c.C + 1}"));
-                            string digitsStr = "{" + string.Join(", ", dCombo.OrderBy(v => v).Select(Board.FormatValue)) + "}";
-                            string expl = $"{subsetName}: In {unitName}, digits {digitsStr} appear only in cells {cellsStr}, eliminating other candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}.";
+                            foreach (var (unitName, unitCells) in units)
+                            {
+                                if (unitCells.Any(c => c.R == rA && c.C == cA) && unitCells.Any(c => c.R == rB && c.C == cB))
+                                {
+                                    var candsA = board.GetCandidates(rA, cA);
+                                    var candsB = board.GetCandidates(rB, cB);
+                                    if (candsA.Count == 2 && candsB.Count == 2 &&
+                                        candsA.Contains(targetVal) && candsA.Contains(otherVal) &&
+                                        candsB.Contains(targetVal) && candsB.Contains(otherVal))
+                                    {
+                                        var involved = new List<(int, int)> { (rA, cA), (rB, cB), (targetRow, targetCol) };
+                                        var arrows = new List<DeductionArrow>
+                                        {
+                                            new(rA, cA, targetRow, targetCol, $"locks {Board.FormatValue(targetVal)}", "#10b981"),
+                                            new(rB, cB, targetRow, targetCol, $"locks {Board.FormatValue(targetVal)}", "#10b981")
+                                        };
+                                        string expl = $"Naked Pair: Cells R{rA + 1}C{cA + 1} and R{rB + 1}C{cB + 1} in {unitName} are locked to candidates {{{Board.FormatValue(Math.Min(targetVal, otherVal))}, {Board.FormatValue(Math.Max(targetVal, otherVal))}}}, eliminating candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}.";
 
-                            return new ClassificationResult(dType, subsetName, expl, $"{subsetName} in {unitName}", involved, arrows, null);
+                                        return new ClassificationResult(DeductionType.NakedPair, "Naked Pair", expl, $"Naked Pair in {unitName}", involved, arrows, null);
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -319,105 +326,129 @@ public static class PatternClassifier
         return null;
     }
 
-    private static ClassificationResult? CheckXWing(Board board, int targetRow, int targetCol, int targetVal)
+    private static ClassificationResult? CheckHiddenSubset(
+        Board board,
+        int targetRow,
+        int targetCol,
+        int targetVal,
+        IReadOnlyList<int> bRows,
+        IReadOnlyList<int> bCols,
+        IReadOnlyList<int> bVals,
+        IReadOnlyList<IReadOnlyList<(int Row, int Col, int Val)>>? branchChains)
     {
         int width = board.Width;
+        int sizex = board.SizeX;
+        int sizey = board.SizeY;
 
-        // 1. Row-based X-Wing (eliminates in columns)
-        var rowCandidateCols = new Dictionary<int, List<int>>();
-        for (int r = 0; r < width; r++)
+        var units = new (string Name, List<(int R, int C)> Cells)[]
         {
-            var cols = new List<int>();
-            for (int c = 0; c < width; c++)
-            {
-                if (board.Get(r, c) == 0 && board.CheckPossible(r, c, targetVal))
-                {
-                    cols.Add(c);
-                }
-            }
-            if (cols.Count == 2)
-            {
-                rowCandidateCols[r] = cols;
-            }
-        }
+            ($"Row {targetRow + 1}", Enumerable.Range(0, width).Select(c => (targetRow, c)).ToList()),
+            ($"Column {targetCol + 1}", Enumerable.Range(0, width).Select(r => (r, targetCol)).ToList()),
+            ($"Box {(targetRow / sizey) * (width / sizex) + (targetCol / sizex) + 1}",
+                GetBoxCells(board, (targetRow / sizey) * sizey, (targetCol / sizex) * sizex))
+        };
 
-        var rKeys = rowCandidateCols.Keys.ToList();
-        for (int i = 0; i < rKeys.Count; i++)
+        // Scenario 1: Trial on cell (targetRow, targetCol) itself, testing the hidden candidates
+        if (bRows.All(r => r == targetRow) && bCols.All(c => c == targetCol) && bRows.Count >= 2 && bRows.Count <= 3)
         {
-            for (int j = i + 1; j < rKeys.Count; j++)
+            var trialVals = bVals.Select(v => v + 1).ToHashSet();
+            if (!trialVals.Contains(targetVal))
             {
-                int r1 = rKeys[i];
-                int r2 = rKeys[j];
-                var c1List = rowCandidateCols[r1];
-                var c2List = rowCandidateCols[r2];
-
-                if (c1List[0] == c2List[0] && c1List[1] == c2List[1])
+                foreach (var (unitName, unitCells) in units)
                 {
-                    int c1 = c1List[0];
-                    int c2 = c1List[1];
-
-                    if ((targetCol == c1 || targetCol == c2) && targetRow != r1 && targetRow != r2)
+                    var emptyCells = unitCells.Where(c => board.Get(c.R, c.C) == 0).ToList();
+                    for (int size = trialVals.Count; size <= 3 && size <= emptyCells.Count; size++)
                     {
-                        var involved = new List<(int, int)> { (r1, c1), (r1, c2), (r2, c1), (r2, c2), (targetRow, targetCol) };
-                        var arrows = new List<DeductionArrow>
+                        var eligibleDigits = new List<int>();
+                        for (int d = 1; d <= width; d++)
                         {
-                            new(r1, c1, r2, c2, "X", "#f59e0b"),
-                            new(r1, c2, r2, c1, "X", "#f59e0b"),
-                            new(r1, targetCol, targetRow, targetCol, $"eliminates {Board.FormatValue(targetVal)}", "#ef4444")
-                        };
+                            if (d == targetVal) continue;
+                            int count = emptyCells.Count(c => board.CheckPossible(c.R, c.C, d));
+                            if (count >= 2 && count <= size) eligibleDigits.Add(d);
+                        }
 
-                        string expl = $"X-Wing: Candidate {Board.FormatValue(targetVal)} in Rows {r1 + 1} and {r2 + 1} is locked into Columns {c1 + 1} and {c2 + 1}, forming an X-Wing that eliminates candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}.";
-                        return new ClassificationResult(DeductionType.XWing, "X-Wing", expl, $"X-Wing in Rows {r1 + 1}, {r2 + 1}", involved, arrows, null);
+                        if (trialVals.All(tv => eligibleDigits.Contains(tv)))
+                        {
+                            foreach (var dCombo in Combinations(eligibleDigits, size))
+                            {
+                                if (!trialVals.All(tv => dCombo.Contains(tv))) continue;
+
+                                var cellsUnion = new HashSet<(int R, int C)>();
+                                foreach (var d in dCombo)
+                                {
+                                    foreach (var c in emptyCells.Where(cell => board.CheckPossible(cell.R, cell.C, d)))
+                                        cellsUnion.Add(c);
+                                }
+
+                                if (cellsUnion.Count == size && cellsUnion.Contains((targetRow, targetCol)))
+                                {
+                                    string subsetName = size == 2 ? "Hidden Pair" : "Hidden Triple";
+                                    var dType = size == 2 ? DeductionType.HiddenPair : DeductionType.HiddenTriple;
+
+                                    var involved = cellsUnion.ToList();
+                                    string digitsStr = "{" + string.Join(", ", dCombo.OrderBy(v => v).Select(Board.FormatValue)) + "}";
+                                    var arrows = cellsUnion.Where(c => c != (targetRow, targetCol))
+                                        .Select(c => new DeductionArrow(c.R, c.C, targetRow, targetCol, $"hidden {digitsStr}", "#ec4899")).ToList();
+                                    string cellsStr = string.Join(", ", cellsUnion.Select(c => $"R{c.R + 1}C{c.C + 1}"));
+                                    string expl = $"{subsetName}: In {unitName}, digits {digitsStr} appear only in cells {cellsStr}, eliminating other candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}.";
+
+                                    return new ClassificationResult(dType, subsetName, expl, $"{subsetName} in {unitName}", involved, arrows, null);
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
 
-        // 2. Column-based X-Wing (eliminates in rows)
-        var colCandidateRows = new Dictionary<int, List<int>>();
-        for (int c = 0; c < width; c++)
+        // Scenario 2: Trial on a hidden value v1 across cells in unit U containing targetCell,
+        // and the other branch forces targetCell to take hidden value v2
+        if (bVals.All(v => v == bVals[0]) && bRows.Count == 2)
         {
-            var rows = new List<int>();
-            for (int r = 0; r < width; r++)
+            int v1 = bVals[0] + 1;
+            if (v1 != targetVal)
             {
-                if (board.Get(r, c) == 0 && board.CheckPossible(r, c, targetVal))
+                int targetIdx = -1;
+                for (int i = 0; i < 2; i++)
                 {
-                    rows.Add(r);
+                    if (bRows[i] == targetRow && bCols[i] == targetCol) { targetIdx = i; break; }
                 }
-            }
-            if (rows.Count == 2)
-            {
-                colCandidateRows[c] = rows;
-            }
-        }
 
-        var cKeys = colCandidateRows.Keys.ToList();
-        for (int i = 0; i < cKeys.Count; i++)
-        {
-            for (int j = i + 1; j < cKeys.Count; j++)
-            {
-                int c1 = cKeys[i];
-                int c2 = cKeys[j];
-                var r1List = colCandidateRows[c1];
-                var r2List = colCandidateRows[c2];
-
-                if (r1List[0] == r2List[0] && r1List[1] == r2List[1])
+                if (targetIdx >= 0)
                 {
-                    int r1 = r1List[0];
-                    int r2 = r1List[1];
+                    int otherIdx = 1 - targetIdx;
+                    int rOther = bRows[otherIdx];
+                    int cOther = bCols[otherIdx];
 
-                    if ((targetRow == r1 || targetRow == r2) && targetCol != c1 && targetCol != c2)
+                    if (branchChains != null && otherIdx < branchChains.Count)
                     {
-                        var involved = new List<(int, int)> { (r1, c1), (r1, c2), (r2, c1), (r2, c2), (targetRow, targetCol) };
-                        var arrows = new List<DeductionArrow>
+                        foreach (var step in branchChains[otherIdx].Skip(1))
                         {
-                            new(r1, c1, r2, c2, "X", "#f59e0b"),
-                            new(r1, c2, r2, c1, "X", "#f59e0b"),
-                            new(targetRow, c1, targetRow, targetCol, $"eliminates {Board.FormatValue(targetVal)}", "#ef4444")
-                        };
+                            if (step.Row == targetRow && step.Col == targetCol && step.Val != targetVal && step.Val != v1)
+                            {
+                                int v2 = step.Val;
+                                foreach (var (unitName, unitCells) in units)
+                                {
+                                    if (unitCells.Any(c => c.R == rOther && c.C == cOther))
+                                    {
+                                        int countV1 = unitCells.Count(c => board.Get(c.R, c.C) == 0 && board.CheckPossible(c.R, c.C, v1));
+                                        int countV2 = unitCells.Count(c => board.Get(c.R, c.C) == 0 && board.CheckPossible(c.R, c.C, v2));
 
-                        string expl = $"X-Wing: Candidate {Board.FormatValue(targetVal)} in Columns {c1 + 1} and {c2 + 1} is locked into Rows {r1 + 1} and {r2 + 1}, forming an X-Wing that eliminates candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}.";
-                        return new ClassificationResult(DeductionType.XWing, "X-Wing", expl, $"X-Wing in Columns {c1 + 1}, {c2 + 1}", involved, arrows, null);
+                                        if (countV1 == 2 && countV2 == 2)
+                                        {
+                                            var involved = new List<(int, int)> { (targetRow, targetCol), (rOther, cOther) };
+                                            var arrows = new List<DeductionArrow>
+                                            {
+                                                new(rOther, cOther, targetRow, targetCol, $"hidden {{{Board.FormatValue(Math.Min(v1, v2))}, {Board.FormatValue(Math.Max(v1, v2))}}}", "#ec4899")
+                                            };
+                                            string expl = $"Hidden Pair: In {unitName}, digits {{{Board.FormatValue(Math.Min(v1, v2))}, {Board.FormatValue(Math.Max(v1, v2))}}} appear only in cells R{targetRow + 1}C{targetCol + 1} and R{rOther + 1}C{cOther + 1}, eliminating other candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}.";
+
+                                            return new ClassificationResult(DeductionType.HiddenPair, "Hidden Pair", expl, $"Hidden Pair in {unitName}", involved, arrows, null);
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -426,60 +457,186 @@ public static class PatternClassifier
         return null;
     }
 
-    private static ClassificationResult? CheckXYWing(Board board, int targetRow, int targetCol, int targetVal)
+    private static ClassificationResult? CheckXWing(
+        Board board,
+        int targetRow,
+        int targetCol,
+        int targetVal,
+        IReadOnlyList<int> bRows,
+        IReadOnlyList<int> bCols,
+        IReadOnlyList<int> bVals,
+        IReadOnlyList<IReadOnlyList<(int Row, int Col, int Val)>>? branchChains)
     {
+        if (bRows.Count != 2) return null;
+        if (bVals[0] != targetVal - 1 || bVals[1] != targetVal - 1) return null;
+
         int width = board.Width;
 
-        // Find bi-value cells
-        var bivalueCells = new List<(int R, int C, int V1, int V2)>();
-        for (int r = 0; r < width; r++)
+        // Case A: Row-based X-Wing trial (trial cells in same row r1)
+        if (bRows[0] == bRows[1] && bCols[0] != bCols[1])
         {
-            for (int c = 0; c < width; c++)
+            int r1 = bRows[0];
+            int c0 = bCols[0];
+            int c1 = bCols[1];
+
+            if ((targetCol == c0 || targetCol == c1) && targetRow != r1)
             {
-                if (board.Get(r, c) == 0)
+                int cTarget = targetCol;
+                int cOther = (targetCol == c0) ? c1 : c0;
+                int branchOtherIdx = (targetCol == c0) ? 1 : 0;
+
+                int r2 = -1;
+                if (branchChains != null && branchOtherIdx < branchChains.Count)
                 {
-                    var cands = board.GetCandidates(r, c);
-                    if (cands.Count == 2)
+                    foreach (var step in branchChains[branchOtherIdx].Skip(1))
                     {
-                        bivalueCells.Add((r, c, cands[0], cands[1]));
+                        if (step.Col == cTarget && step.Val == targetVal && step.Row != r1 && step.Row != targetRow)
+                        {
+                            r2 = step.Row;
+                            break;
+                        }
+                    }
+                }
+
+                if (r2 < 0)
+                {
+                    for (int r = 0; r < width; r++)
+                    {
+                        if (r != r1 && r != targetRow && board.Get(r, cTarget) == 0 && board.CheckPossible(r, cTarget, targetVal) &&
+                            board.Get(r, cOther) == 0 && board.CheckPossible(r, cOther, targetVal))
+                        {
+                            int candCount = 0;
+                            for (int c = 0; c < width; c++)
+                            {
+                                if (board.Get(r, c) == 0 && board.CheckPossible(r, c, targetVal)) candCount++;
+                            }
+                            if (candCount == 2)
+                            {
+                                r2 = r;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (r2 >= 0)
+                {
+                    int candCountR1 = 0;
+                    for (int c = 0; c < width; c++)
+                    {
+                        if (board.Get(r1, c) == 0 && board.CheckPossible(r1, c, targetVal)) candCountR1++;
+                    }
+                    int candCountR2 = 0;
+                    for (int c = 0; c < width; c++)
+                    {
+                        if (board.Get(r2, c) == 0 && board.CheckPossible(r2, c, targetVal)) candCountR2++;
+                    }
+
+                    if (candCountR1 == 2 && candCountR2 == 2)
+                    {
+                        var involved = new List<(int, int)> { (r1, cTarget), (r1, cOther), (r2, cTarget), (r2, cOther), (targetRow, targetCol) };
+                        var arrows = new List<DeductionArrow>
+                        {
+                            new(r1, cOther, r2, cTarget, $"forces ={Board.FormatValue(targetVal)}", "#f59e0b", BranchIndex: 1, StepIndex: 0, EnablingCells: GetEnablingCells(board, r1, cOther, r2, cTarget)),
+                            new(r1, cTarget, targetRow, targetCol, $"≠{Board.FormatValue(targetVal)}", "#38bdf8", BranchIndex: 0, StepIndex: 0, EnablingCells: GetEnablingCells(board, r1, cTarget, targetRow, targetCol)),
+                            new(r2, cTarget, targetRow, targetCol, $"≠{Board.FormatValue(targetVal)}", "#f59e0b", BranchIndex: 1, StepIndex: 1, EnablingCells: GetEnablingCells(board, r2, cTarget, targetRow, targetCol))
+                        };
+
+                        string expl = $"X-Wing: Candidate {Board.FormatValue(targetVal)} in Rows {r1 + 1} and {r2 + 1} is locked into Columns {Math.Min(c0, c1) + 1} and {Math.Max(c0, c1) + 1}, forming an X-Wing that eliminates candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}.";
+                        return new ClassificationResult(
+                            DeductionType.XWing,
+                            "X-Wing",
+                            expl,
+                            $"X-Wing in Rows {r1 + 1}, {r2 + 1}",
+                            involved,
+                            arrows,
+                            null
+                        );
                     }
                 }
             }
         }
 
-        // Pivot P has {A, B} (neither is targetVal)
-        foreach (var p in bivalueCells)
+        // Case B: Column-based X-Wing trial (trial cells in same column c1)
+        if (bCols[0] == bCols[1] && bRows[0] != bRows[1])
         {
-            if (p.V1 == targetVal || p.V2 == targetVal) continue;
-            int A = p.V1;
-            int B = p.V2;
+            int c1 = bCols[0];
+            int r0 = bRows[0];
+            int r1 = bRows[1];
 
-            // Pincer Q1 must have {A, targetVal} and see P
-            var q1Candidates = bivalueCells.Where(q => q != p && ((q.V1 == A && q.V2 == targetVal) || (q.V2 == A && q.V1 == targetVal)) && CanSee(board, p.R, p.C, q.R, q.C)).ToList();
-
-            // Pincer Q2 must have {B, targetVal} and see P
-            var q2Candidates = bivalueCells.Where(q => q != p && ((q.V1 == B && q.V2 == targetVal) || (q.V2 == B && q.V1 == targetVal)) && CanSee(board, p.R, p.C, q.R, q.C)).ToList();
-
-            foreach (var q1 in q1Candidates)
+            if ((targetRow == r0 || targetRow == r1) && targetCol != c1)
             {
-                foreach (var q2 in q2Candidates)
-                {
-                    if (q1.R == q2.R && q1.C == q2.C) continue;
+                int rTarget = targetRow;
+                int rOther = (targetRow == r0) ? r1 : r0;
+                int branchOtherIdx = (targetRow == r0) ? 1 : 0;
 
-                    // Target must see both Q1 and Q2
-                    if (CanSee(board, targetRow, targetCol, q1.R, q1.C) && CanSee(board, targetRow, targetCol, q2.R, q2.C))
+                int c2 = -1;
+                if (branchChains != null && branchOtherIdx < branchChains.Count)
+                {
+                    foreach (var step in branchChains[branchOtherIdx].Skip(1))
                     {
-                        var involved = new List<(int, int)> { (p.R, p.C), (q1.R, q1.C), (q2.R, q2.C), (targetRow, targetCol) };
+                        if (step.Row == rTarget && step.Val == targetVal && step.Col != c1 && step.Col != targetCol)
+                        {
+                            c2 = step.Col;
+                            break;
+                        }
+                    }
+                }
+
+                if (c2 < 0)
+                {
+                    for (int c = 0; c < width; c++)
+                    {
+                        if (c != c1 && c != targetCol && board.Get(rTarget, c) == 0 && board.CheckPossible(rTarget, c, targetVal) &&
+                            board.Get(rOther, c) == 0 && board.CheckPossible(rOther, c, targetVal))
+                        {
+                            int candCount = 0;
+                            for (int r = 0; r < width; r++)
+                            {
+                                if (board.Get(r, c) == 0 && board.CheckPossible(r, c, targetVal)) candCount++;
+                            }
+                            if (candCount == 2)
+                            {
+                                c2 = c;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (c2 >= 0)
+                {
+                    int candCountC1 = 0;
+                    for (int r = 0; r < width; r++)
+                    {
+                        if (board.Get(r, c1) == 0 && board.CheckPossible(r, c1, targetVal)) candCountC1++;
+                    }
+                    int candCountC2 = 0;
+                    for (int r = 0; r < width; r++)
+                    {
+                        if (board.Get(r, c2) == 0 && board.CheckPossible(r, c2, targetVal)) candCountC2++;
+                    }
+
+                    if (candCountC1 == 2 && candCountC2 == 2)
+                    {
+                        var involved = new List<(int, int)> { (rTarget, c1), (rOther, c1), (rTarget, c2), (rOther, c2), (targetRow, targetCol) };
                         var arrows = new List<DeductionArrow>
                         {
-                            new(p.R, p.C, q1.R, q1.C, Board.FormatValue(A), "#38bdf8"),
-                            new(p.R, p.C, q2.R, q2.C, Board.FormatValue(B), "#38bdf8"),
-                            new(q1.R, q1.C, targetRow, targetCol, $"≠{Board.FormatValue(targetVal)}", "#ef4444"),
-                            new(q2.R, q2.C, targetRow, targetCol, $"≠{Board.FormatValue(targetVal)}", "#ef4444")
+                            new(rOther, c1, rTarget, c2, $"forces ={Board.FormatValue(targetVal)}", "#f59e0b", BranchIndex: 1, StepIndex: 0, EnablingCells: GetEnablingCells(board, rOther, c1, rTarget, c2)),
+                            new(rTarget, c1, targetRow, targetCol, $"≠{Board.FormatValue(targetVal)}", "#38bdf8", BranchIndex: 0, StepIndex: 0, EnablingCells: GetEnablingCells(board, rTarget, c1, targetRow, targetCol)),
+                            new(rTarget, c2, targetRow, targetCol, $"≠{Board.FormatValue(targetVal)}", "#f59e0b", BranchIndex: 1, StepIndex: 1, EnablingCells: GetEnablingCells(board, rTarget, c2, targetRow, targetCol))
                         };
 
-                        string expl = $"XY-Wing: Pivot R{p.R + 1}C{p.C + 1} ({Board.FormatValue(A)}, {Board.FormatValue(B)}) with pincers R{q1.R + 1}C{q1.C + 1} ({Board.FormatValue(A)}, {Board.FormatValue(targetVal)}) and R{q2.R + 1}C{q2.C + 1} ({Board.FormatValue(B)}, {Board.FormatValue(targetVal)}) eliminates candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}.";
-                        return new ClassificationResult(DeductionType.XYWing, "XY-Wing", expl, $"XY-Wing Pivot R{p.R + 1}C{p.C + 1}", involved, arrows, null);
+                        string expl = $"X-Wing: Candidate {Board.FormatValue(targetVal)} in Columns {c1 + 1} and {c2 + 1} is locked into Rows {Math.Min(r0, r1) + 1} and {Math.Max(r0, r1) + 1}, forming an X-Wing that eliminates candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}.";
+                        return new ClassificationResult(
+                            DeductionType.XWing,
+                            "X-Wing",
+                            expl,
+                            $"X-Wing in Columns {c1 + 1}, {c2 + 1}",
+                            involved,
+                            arrows,
+                            null
+                        );
                     }
                 }
             }
@@ -488,121 +645,99 @@ public static class PatternClassifier
         return null;
     }
 
-    private static ClassificationResult? CheckSwordfish(Board board, int targetRow, int targetCol, int targetVal)
+    private static ClassificationResult? CheckXYWing(
+        Board board,
+        int targetRow,
+        int targetCol,
+        int targetVal,
+        IReadOnlyList<int> bRows,
+        IReadOnlyList<int> bCols,
+        IReadOnlyList<int> bVals,
+        IReadOnlyList<IReadOnlyList<(int Row, int Col, int Val)>>? branchChains)
     {
-        int width = board.Width;
+        if (bRows.Count != 2) return null;
+        if (bRows[0] != bRows[1] || bCols[0] != bCols[1]) return null;
+        if (branchChains == null || branchChains.Count != 2) return null;
 
-        // 1. Row-based Swordfish
-        var rowCandidateCols = new Dictionary<int, List<int>>();
-        for (int r = 0; r < width; r++)
+        int pR = bRows[0];
+        int pC = bCols[0];
+        int valA = bVals[0] + 1;
+        int valB = bVals[1] + 1;
+        if (valA == targetVal || valB == targetVal) return null;
+
+        // Branch 0 (assumes P = valA) must force a pincer Q1 to targetVal
+        (int R, int C)? q1 = null;
+        foreach (var step in branchChains[0].Skip(1))
         {
-            var cols = new List<int>();
-            for (int c = 0; c < width; c++)
+            if (step.Val == targetVal && (step.Row != pR || step.Col != pC))
             {
-                if (board.Get(r, c) == 0 && board.CheckPossible(r, c, targetVal))
+                if (CanSee(board, pR, pC, step.Row, step.Col) && CanSee(board, targetRow, targetCol, step.Row, step.Col))
                 {
-                    cols.Add(c);
-                }
-            }
-            if (cols.Count >= 2 && cols.Count <= 3)
-            {
-                rowCandidateCols[r] = cols;
-            }
-        }
-
-        var rKeys = rowCandidateCols.Keys.ToList();
-        if (rKeys.Count >= 3)
-        {
-            foreach (var combo in Combinations(rKeys, 3))
-            {
-                var unionCols = new HashSet<int>();
-                foreach (var r in combo)
-                {
-                    foreach (var c in rowCandidateCols[r]) unionCols.Add(c);
-                }
-
-                if (unionCols.Count == 3 && unionCols.Contains(targetCol) && !combo.Contains(targetRow))
-                {
-                    var involved = new List<(int, int)> { (targetRow, targetCol) };
-                    foreach (var r in combo)
-                    {
-                        foreach (var c in rowCandidateCols[r]) involved.Add((r, c));
-                    }
-
-                    var arrows = new List<DeductionArrow>();
-                    foreach (var r in combo)
-                    {
-                        if (rowCandidateCols[r].Contains(targetCol))
-                        {
-                            arrows.Add(new DeductionArrow(r, targetCol, targetRow, targetCol, $"locks {Board.FormatValue(targetVal)}", "#f59e0b"));
-                        }
-                    }
-
-                    string rowsStr = string.Join(", ", combo.Select(r => $"Row {r + 1}"));
-                    string colsStr = string.Join(", ", unionCols.OrderBy(c => c).Select(c => $"Col {c + 1}"));
-                    string expl = $"Swordfish: Candidate {Board.FormatValue(targetVal)} across {rowsStr} is locked into {colsStr}, forming a Swordfish that eliminates candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}.";
-
-                    return new ClassificationResult(DeductionType.Swordfish, "Swordfish", expl, $"Swordfish (3-Fish)", involved, arrows, null);
+                    q1 = (step.Row, step.Col);
+                    break;
                 }
             }
         }
+        if (q1 == null) return null;
 
-        // 2. Column-based Swordfish
-        var colCandidateRows = new Dictionary<int, List<int>>();
-        for (int c = 0; c < width; c++)
+        // Branch 1 (assumes P = valB) must force a pincer Q2 to targetVal
+        (int R, int C)? q2 = null;
+        foreach (var step in branchChains[1].Skip(1))
         {
-            var rows = new List<int>();
-            for (int r = 0; r < width; r++)
+            if (step.Val == targetVal && (step.Row != pR || step.Col != pC))
             {
-                if (board.Get(r, c) == 0 && board.CheckPossible(r, c, targetVal))
+                if (CanSee(board, pR, pC, step.Row, step.Col) && CanSee(board, targetRow, targetCol, step.Row, step.Col))
                 {
-                    rows.Add(r);
-                }
-            }
-            if (rows.Count >= 2 && rows.Count <= 3)
-            {
-                colCandidateRows[c] = rows;
-            }
-        }
-
-        var cKeys = colCandidateRows.Keys.ToList();
-        if (cKeys.Count >= 3)
-        {
-            foreach (var combo in Combinations(cKeys, 3))
-            {
-                var unionRows = new HashSet<int>();
-                foreach (var c in combo)
-                {
-                    foreach (var r in colCandidateRows[c]) unionRows.Add(r);
-                }
-
-                if (unionRows.Count == 3 && unionRows.Contains(targetRow) && !combo.Contains(targetCol))
-                {
-                    var involved = new List<(int, int)> { (targetRow, targetCol) };
-                    foreach (var c in combo)
-                    {
-                        foreach (var r in colCandidateRows[c]) involved.Add((r, c));
-                    }
-
-                    var arrows = new List<DeductionArrow>();
-                    foreach (var c in combo)
-                    {
-                        if (colCandidateRows[c].Contains(targetRow))
-                        {
-                            arrows.Add(new DeductionArrow(targetRow, c, targetRow, targetCol, $"locks {Board.FormatValue(targetVal)}", "#f59e0b"));
-                        }
-                    }
-
-                    string colsStr = string.Join(", ", combo.Select(c => $"Col {c + 1}"));
-                    string rowsStr = string.Join(", ", unionRows.OrderBy(r => r).Select(r => $"Row {r + 1}"));
-                    string expl = $"Swordfish: Candidate {Board.FormatValue(targetVal)} across {colsStr} is locked into {rowsStr}, forming a Swordfish that eliminates candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}.";
-
-                    return new ClassificationResult(DeductionType.Swordfish, "Swordfish", expl, $"Swordfish (3-Fish)", involved, arrows, null);
+                    q2 = (step.Row, step.Col);
+                    break;
                 }
             }
         }
+        if (q2 == null) return null;
 
-        return null;
+        if (q1.Value.R == q2.Value.R && q1.Value.C == q2.Value.C) return null;
+
+        var q1Cands = board.GetCandidates(q1.Value.R, q1.Value.C);
+        var q2Cands = board.GetCandidates(q2.Value.R, q2.Value.C);
+        if (!q1Cands.Contains(targetVal) || !q1Cands.Contains(valA)) return null;
+        if (!q2Cands.Contains(targetVal) || !q2Cands.Contains(valB)) return null;
+
+        var involved = new List<(int, int)> { (pR, pC), (q1.Value.R, q1.Value.C), (q2.Value.R, q2.Value.C), (targetRow, targetCol) };
+        var arrows = new List<DeductionArrow>
+        {
+            new(pR, pC, q1.Value.R, q1.Value.C, Board.FormatValue(valA), "#38bdf8", BranchIndex: 0, StepIndex: 0, EnablingCells: GetEnablingCells(board, pR, pC, q1.Value.R, q1.Value.C)),
+            new(pR, pC, q2.Value.R, q2.Value.C, Board.FormatValue(valB), "#f59e0b", BranchIndex: 1, StepIndex: 0, EnablingCells: GetEnablingCells(board, pR, pC, q2.Value.R, q2.Value.C)),
+            new(q1.Value.R, q1.Value.C, targetRow, targetCol, $"≠{Board.FormatValue(targetVal)}", "#38bdf8", BranchIndex: 0, StepIndex: 1, EnablingCells: GetEnablingCells(board, q1.Value.R, q1.Value.C, targetRow, targetCol)),
+            new(q2.Value.R, q2.Value.C, targetRow, targetCol, $"≠{Board.FormatValue(targetVal)}", "#f59e0b", BranchIndex: 1, StepIndex: 1, EnablingCells: GetEnablingCells(board, q2.Value.R, q2.Value.C, targetRow, targetCol))
+        };
+
+        var chainSteps = new List<ChainStepInfo>
+        {
+            new(0, 0, $"Assume Pivot R{pR + 1}C{pC + 1} = {Board.FormatValue(valA)} ➔ Forces Pincer R{q1.Value.R + 1}C{q1.Value.C + 1} = {Board.FormatValue(targetVal)}", pR, pC, q1.Value.R, q1.Value.C, $"={Board.FormatValue(targetVal)}", GetEnablingCells(board, pR, pC, q1.Value.R, q1.Value.C)),
+            new(0, 1, $"Pincer R{q1.Value.R + 1}C{q1.Value.C + 1} = {Board.FormatValue(targetVal)} ➔ Eliminates {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}", q1.Value.R, q1.Value.C, targetRow, targetCol, $"≠{Board.FormatValue(targetVal)}", GetEnablingCells(board, q1.Value.R, q1.Value.C, targetRow, targetCol)),
+            new(1, 0, $"Assume Pivot R{pR + 1}C{pC + 1} = {Board.FormatValue(valB)} ➔ Forces Pincer R{q2.Value.R + 1}C{q2.Value.C + 1} = {Board.FormatValue(targetVal)}", pR, pC, q2.Value.R, q2.Value.C, $"={Board.FormatValue(targetVal)}", GetEnablingCells(board, pR, pC, q2.Value.R, q2.Value.C)),
+            new(1, 1, $"Pincer R{q2.Value.R + 1}C{q2.Value.C + 1} = {Board.FormatValue(targetVal)} ➔ Eliminates {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}", q2.Value.R, q2.Value.C, targetRow, targetCol, $"≠{Board.FormatValue(targetVal)}", GetEnablingCells(board, q2.Value.R, q2.Value.C, targetRow, targetCol)),
+        };
+
+        var proofChain = new List<string>
+        {
+            $"Hypothesis 1: If R{pR + 1}C{pC + 1} = {Board.FormatValue(valA)} ➔ Pincer R{q1.Value.R + 1}C{q1.Value.C + 1} = {Board.FormatValue(targetVal)} ➔ Eliminates {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}",
+            $"Hypothesis 2: If R{pR + 1}C{pC + 1} = {Board.FormatValue(valB)} ➔ Pincer R{q2.Value.R + 1}C{q2.Value.C + 1} = {Board.FormatValue(targetVal)} ➔ Eliminates {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}",
+            $"Conclusion: In all hypotheses, candidate {Board.FormatValue(targetVal)} is eliminated from R{targetRow + 1}C{targetCol + 1}."
+        };
+
+        string expl = $"XY-Wing: Pivot R{pR + 1}C{pC + 1} ({Board.FormatValue(valA)}, {Board.FormatValue(valB)}) with pincers R{q1.Value.R + 1}C{q1.Value.C + 1} ({Board.FormatValue(valA)}, {Board.FormatValue(targetVal)}) and R{q2.Value.R + 1}C{q2.Value.C + 1} ({Board.FormatValue(valB)}, {Board.FormatValue(targetVal)}) eliminates candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}.";
+
+        return new ClassificationResult(
+            DeductionType.XYWing,
+            "XY-Wing",
+            expl,
+            $"XY-Wing Pivot R{pR + 1}C{pC + 1}",
+            involved,
+            arrows,
+            proofChain,
+            chainSteps
+        );
     }
 
     private static ClassificationResult BuildForcingChainResult(
