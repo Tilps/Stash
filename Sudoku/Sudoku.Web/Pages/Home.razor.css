@@ -138,9 +138,7 @@
     box-sizing: border-box;
     width: min(88vw, 440px);
     height: min(88vw, 440px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: block;
 }
 
 .sudoku-board-container.board-size-6 {
@@ -687,15 +685,18 @@
 }
 
 /* Board Arrow Overlay */
+::deep .board-arrow-overlay,
 .board-arrow-overlay {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 10;
+    position: absolute !important;
+    top: 3px !important;
+    left: 3px !important;
+    width: calc(100% - 6px) !important;
+    height: calc(100% - 6px) !important;
+    pointer-events: none !important;
+    z-index: 20 !important;
 }
 
+::deep .animated-arrow-line,
 .animated-arrow-line {
     filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.85));
     animation: dashOffset 1.6s linear infinite;
@@ -710,6 +711,7 @@
     }
 }
 
+::deep .arrow-label-group text,
 .arrow-label-group text {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }

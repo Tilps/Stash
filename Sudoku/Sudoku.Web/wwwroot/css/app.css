@@ -113,3 +113,28 @@ code {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+
+/* Sudoku Board Arrow Overlay */
+.board-arrow-overlay {
+    position: absolute !important;
+    top: 3px !important;
+    left: 3px !important;
+    width: calc(100% - 6px) !important;
+    height: calc(100% - 6px) !important;
+    pointer-events: none !important;
+    z-index: 20 !important;
+}
+
+.animated-arrow-line {
+    filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.85));
+    animation: dashOffset 1.6s linear infinite;
+}
+
+@keyframes dashOffset {
+    from {
+        stroke-dashoffset: 18;
+    }
+    to {
+        stroke-dashoffset: 0;
+    }
+}

@@ -102,8 +102,8 @@
         <!-- Left Column: Board + Keypad -->
         <div class="board-column">
             <!-- Dynamic Sudoku Board -->
-            <div class="sudoku-board-container board-size-@width">
-                <div class="sudoku-board" style="grid-template-columns: repeat(@width, minmax(0, 1fr)); grid-template-rows: repeat(@width, minmax(0, 1fr));">
+            <div class="sudoku-board-container board-size-@width" style="position: relative;">
+                <div class="sudoku-board" style="grid-template-columns: repeat(@width, minmax(0, 1fr)); grid-template-rows: repeat(@width, minmax(0, 1fr)); width: 100%; height: 100%; flex-shrink: 0;">
                     @for (int r = 0; r < width; r++)
                     {
                         for (int c = 0; c < width; c++)
@@ -166,25 +166,27 @@
 
                 @if (activeStep?.Arrows != null && activeStep.Arrows.Count > 0)
                 {
-                    <svg class="board-arrow-overlay" viewBox="0 0 @(width * 100) @(width * 100)" preserveAspectRatio="none">
+                    <svg class="board-arrow-overlay"
+                         viewBox="0 0 @(width * 100) @(width * 100)"
+                         style="position: absolute; top: 3px; left: 3px; width: calc(100% - 6px); height: calc(100% - 6px); pointer-events: none; z-index: 20;">
                         <defs>
-                            <marker id="arrowhead-sky" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
-                                <polygon points="0 0, 9 3.5, 0 7" fill="#38bdf8" />
+                            <marker id="arrowhead-sky" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto">
+                                <polygon points="0 0, 10 4, 0 8" fill="#38bdf8" />
                             </marker>
-                            <marker id="arrowhead-purple" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
-                                <polygon points="0 0, 9 3.5, 0 7" fill="#a855f7" />
+                            <marker id="arrowhead-purple" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto">
+                                <polygon points="0 0, 10 4, 0 8" fill="#a855f7" />
                             </marker>
-                            <marker id="arrowhead-emerald" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
-                                <polygon points="0 0, 9 3.5, 0 7" fill="#10b981" />
+                            <marker id="arrowhead-emerald" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto">
+                                <polygon points="0 0, 10 4, 0 8" fill="#10b981" />
                             </marker>
-                            <marker id="arrowhead-amber" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
-                                <polygon points="0 0, 9 3.5, 0 7" fill="#f59e0b" />
+                            <marker id="arrowhead-amber" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto">
+                                <polygon points="0 0, 10 4, 0 8" fill="#f59e0b" />
                             </marker>
-                            <marker id="arrowhead-red" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
-                                <polygon points="0 0, 9 3.5, 0 7" fill="#ef4444" />
+                            <marker id="arrowhead-red" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto">
+                                <polygon points="0 0, 10 4, 0 8" fill="#ef4444" />
                             </marker>
-                            <marker id="arrowhead-pink" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
-                                <polygon points="0 0, 9 3.5, 0 7" fill="#ec4899" />
+                            <marker id="arrowhead-pink" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto">
+                                <polygon points="0 0, 10 4, 0 8" fill="#ec4899" />
                             </marker>
                         </defs>
 
@@ -194,9 +196,9 @@
                             string markerId = GetArrowMarkerId(arrow.Color);
 
                             <line x1="@coords.X1" y1="@coords.Y1" x2="@coords.X2" y2="@coords.Y2"
-                                  stroke="@arrow.Color" stroke-width="3.5"
+                                  stroke="@arrow.Color" stroke-width="4"
                                   stroke-linecap="round"
-                                  stroke-dasharray="6,3"
+                                  stroke-dasharray="8,4"
                                   marker-end="url(#@markerId)"
                                   class="animated-arrow-line" />
 
@@ -204,10 +206,12 @@
                             {
                                 double mx = (coords.X1 + coords.X2) / 2.0;
                                 double my = (coords.Y1 + coords.Y2) / 2.0;
+                                double pillWidth = Math.Max(54.0, (arrow.Label.Length * 11.5) + 16.0);
+                                double pillHeight = 24.0;
                                 <g class="arrow-label-group">
-                                    <rect x="@(mx - 28)" y="@(my - 11)" width="56" height="20" rx="4"
-                                          fill="#0f172a" stroke="@arrow.Color" stroke-width="1.5" />
-                                    <text x="@mx" y="@(my + 1)" fill="#f1f5f9" font-size="11" font-weight="700"
+                                    <rect x="@(mx - pillWidth / 2.0)" y="@(my - pillHeight / 2.0)" width="@pillWidth" height="@pillHeight" rx="5"
+                                          fill="#0b1120" stroke="@arrow.Color" stroke-width="2" />
+                                    <text x="@mx" y="@(my + 1)" fill="#f8fafc" font-size="14" font-weight="700"
                                           text-anchor="middle" dominant-baseline="middle">
                                         @arrow.Label
                                     </text>
@@ -892,10 +896,12 @@
 
         if (len > 0)
         {
-            double startX = c1X + (dx / len) * 26.0;
-            double startY = c1Y + (dy / len) * 26.0;
-            double endX = c2X - (dx / len) * 32.0;
-            double endY = c2Y - (dy / len) * 32.0;
+            double trimStart = Math.Min(26.0, len * 0.25);
+            double trimEnd = Math.Min(32.0, len * 0.35);
+            double startX = c1X + (dx / len) * trimStart;
+            double startY = c1Y + (dy / len) * trimStart;
+            double endX = c2X - (dx / len) * trimEnd;
+            double endY = c2Y - (dy / len) * trimEnd;
             return (startX, startY, endX, endY);
         }
 
