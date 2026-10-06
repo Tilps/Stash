@@ -125,50 +125,51 @@
 }
 
 /* 9x9 Sudoku Board */
+/* Sudoku Board Container */
 .sudoku-board-container {
     background: #0f172a;
     border: 3px solid #64748b;
     border-radius: 8px;
-    padding: 4px;
+    padding: 3px;
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 15px rgba(56, 189, 248, 0.1);
     user-select: none;
     touch-action: manipulation;
+    box-sizing: border-box;
+    width: min(88vw, 440px);
+    height: min(88vw, 440px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sudoku-board-container.board-size-6 {
+    width: min(88vw, 390px);
+    height: min(88vw, 390px);
+}
+
+.sudoku-board-container.board-size-9 {
+    width: min(88vw, 440px);
+    height: min(88vw, 440px);
+}
+
+.sudoku-board-container.board-size-12 {
+    width: min(88vw, 490px);
+    height: min(88vw, 490px);
+}
+
+.sudoku-board-container.board-size-16 {
+    width: min(88vw, 540px);
+    height: min(88vw, 540px);
 }
 
 .sudoku-board {
     display: grid;
-    grid-template-columns: repeat(var(--board-width, 9), 1fr);
-    grid-template-rows: repeat(var(--board-width, 9), 1fr);
-    width: min(88vw, calc(44px * var(--board-width, 9)));
-    max-width: 540px;
-    height: min(88vw, calc(44px * var(--board-width, 9)));
-    max-height: 540px;
+    width: 100%;
+    height: 100%;
     background: #1e293b;
     gap: 1px;
-}
-
-.sudoku-board.board-size-6 {
-    max-width: 420px;
-    max-height: 420px;
-    font-size: 1.85rem;
-}
-
-.sudoku-board.board-size-9 {
-    max-width: 450px;
-    max-height: 450px;
-    font-size: 1.55rem;
-}
-
-.sudoku-board.board-size-12 {
-    max-width: 520px;
-    max-height: 520px;
-    font-size: 1.15rem;
-}
-
-.sudoku-board.board-size-16 {
-    max-width: 560px;
-    max-height: 560px;
-    font-size: 0.88rem;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 .sudoku-cell {
@@ -180,6 +181,27 @@
     font-weight: 700;
     cursor: pointer;
     transition: background-color 0.12s ease;
+    box-sizing: border-box;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    line-height: 1;
+}
+
+.board-size-6 .sudoku-cell {
+    font-size: 2.1rem;
+}
+
+.board-size-9 .sudoku-cell {
+    font-size: 1.55rem;
+}
+
+.board-size-12 .sudoku-cell {
+    font-size: 1.15rem;
+}
+
+.board-size-16 .sudoku-cell {
+    font-size: 0.85rem;
 }
 
 /* Block Boundary Styling */
@@ -241,23 +263,38 @@
 }
 
 /* Candidates Grid inside Cell */
+/* Candidates Grid inside Cell */
 .candidates-grid {
     display: grid;
-    grid-template-columns: repeat(var(--block-x, 3), 1fr);
-    grid-template-rows: repeat(var(--block-y, 3), 1fr);
     width: 100%;
     height: 100%;
     padding: 1px;
+    box-sizing: border-box;
 }
 
 .candidate-num {
-    font-size: 0.62rem;
+    font-size: 0.65rem;
     font-weight: 600;
     color: #475569;
     display: flex;
     align-items: center;
     justify-content: center;
     line-height: 1;
+    min-width: 0;
+    min-height: 0;
+    user-select: none;
+}
+
+.board-size-6 .candidate-num {
+    font-size: 0.82rem;
+}
+
+.board-size-12 .candidate-num {
+    font-size: 0.55rem;
+}
+
+.board-size-16 .candidate-num {
+    font-size: 0.44rem;
 }
 
 .candidate-num.active {
@@ -284,6 +321,18 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+}
+
+.board-column:has(.board-size-6) .numpad-container {
+    width: min(88vw, 390px);
+}
+
+.board-column:has(.board-size-12) .numpad-container {
+    width: min(88vw, 490px);
+}
+
+.board-column:has(.board-size-16) .numpad-container {
+    width: min(88vw, 540px);
 }
 
 .numpad-grid {

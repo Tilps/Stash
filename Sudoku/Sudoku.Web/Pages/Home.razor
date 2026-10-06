@@ -102,8 +102,8 @@
         <!-- Left Column: Board + Keypad -->
         <div class="board-column">
             <!-- Dynamic Sudoku Board -->
-            <div class="sudoku-board-container">
-                <div class="sudoku-board board-size-@width" style="--board-width: @width; --block-x: @currentSizeX; --block-y: @currentSizeY;">
+            <div class="sudoku-board-container board-size-@width">
+                <div class="sudoku-board" style="grid-template-columns: repeat(@width, minmax(0, 1fr)); grid-template-rows: repeat(@width, minmax(0, 1fr));">
                     @for (int r = 0; r < width; r++)
                     {
                         for (int c = 0; c < width; c++)
@@ -142,7 +142,7 @@
                                 }
                                 else if (showCandidates)
                                 {
-                                    <div class="candidates-grid">
+                                    <div class="candidates-grid" style="grid-template-columns: repeat(@currentSizeX, minmax(0, 1fr)); grid-template-rows: repeat(@currentSizeY, minmax(0, 1fr));">
                                         @for (int d = 1; d <= width; d++)
                                         {
                                             int digit = d;
