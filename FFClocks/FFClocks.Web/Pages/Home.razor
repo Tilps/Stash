@@ -1,0 +1,596 @@
+@page "/"
+@implements IDisposable
+@inject IJSRuntime JS
+
+<PageTitle>FF Clocks - Hands of Time Solver</PageTitle>
+
+<div class="ff-app" @onkeydown="HandleKeyDown" tabindex="0">
+    <!-- Header -->
+    <header class="app-header">
+        <div class="brand">
+            <span class="brand-icon">⏳</span>
+            <div>
+                <h1 class="brand-title">FF CLOCKS</h1>
+                <div class="brand-subtitle">Hands of Time Solver</div>
+            </div>
+        </div>
+        <div class="header-actions">
+            <button class="btn-sm-subtle" @onclick="FillRandomPuzzle" title="Fill clock with a random solvable puzzle">
+                🎲 Random Clock
+            </button>
+            <button class="btn-sm-subtle" @onclick="ClearAll" title="Clear all clock spots">
+                ↺ Clear
+            </button>
+        </div>
+    </header>
+
+    <div class="main-layout">
+        <!-- Left: Clock Face Visualizer -->
+        <div class="card-panel clock-display-wrap">
+            <div class="section-title w-100">
+                <span>Clock Face</span>
+                @if (solverResult?.Success == true)
+                {
+                    <span class="badge-count">@solverResult.Solutions.Count @(solverResult.Solutions.Count == 1 ? "solution" : "solutions")</span>
+                }
+            </div>
+
+            <!-- SVG Clock Dial -->
+            <svg class="clock-svg" viewBox="-180 -180 360 360">
+                <defs>
+                    <!-- Marker for jump paths -->
+                    <marker id="arrow-cw" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 1 L 10 5 L 0 9 z" fill="#00f0ff" />
+                    </marker>
+                    <marker id="arrow-gold" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 1 L 10 5 L 0 9 z" fill="#ffbe0b" />
+                    </marker>
+                    <marker id="arrow-subtle" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                        <path d="M 0 1 L 10 5 L 0 9 z" fill="#64748b" />
+                    </marker>
+                    <filter id="glow-cyan" x="-20%" y="-20%" width="140%" height="140%">
+                        <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#00f0ff" flood-opacity="0.8"/>
+                    </filter>
+                    <filter id="glow-gold" x="-20%" y="-20%" width="140%" height="140%">
+                        <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#ffbe0b" flood-opacity="0.8"/>
+                    </filter>
+                </defs>
+
+                <!-- Clock Outer Ring & Background -->
+                <circle cx="0" cy="0" r="150" fill="#0d1424" stroke="#1f2d4d" stroke-width="3" />
+                <circle cx="0" cy="0" r="144" fill="none" stroke="#17223b" stroke-width="1" stroke-dasharray="3,6" />
+                <circle cx="0" cy="0" r="30" fill="#131c31" stroke="#263554" stroke-width="2" />
+                <circle cx="0" cy="0" r="6" fill="#00f0ff" />
+
+                <!-- Hour tick marks around dial -->
+                @for (int tick = 0; tick < 12; tick++)
+                {
+                    double angle = tick * (Math.PI * 2.0 / 12);
+                    double x1 = 142 * Math.Sin(angle);
+                    double y1 = -142 * Math.Cos(angle);
+                    double x2 = 148 * Math.Sin(angle);
+                    double y2 = -148 * Math.Cos(angle);
+                    <line x1="@x1.ToString("F1")" y1="@y1.ToString("F1")" x2="@x2.ToString("F1")" y2="@y2.ToString("F1")" stroke="#334155" stroke-width="1.5" />
+                }
+
+                <!-- Active Walkthrough Hands & Move Indicator -->
+                @if (CurrentActiveSolution != null && CurrentActiveStep != null)
+                {
+                    var currentStep = CurrentActiveStep;
+                    var (currX, currY) = GetNodeCoordinates(currentStep.NodeIndex);
+
+                    <!-- Arrow from previous step to current step -->
+                    @if (currentStep.FromIndex >= 0)
+                    {
+                        var (fromX, fromY) = GetNodeCoordinates(currentStep.FromIndex);
+                        <line x1="@fromX.ToString("F1")" y1="@fromY.ToString("F1")"
+                              x2="@currX.ToString("F1")" y2="@currY.ToString("F1")"
+                              stroke="#ffbe0b" stroke-width="3.5" stroke-dasharray="4,3"
+                              marker-end="url(#arrow-gold)" filter="url(#glow-gold)" />
+                    }
+
+                    <!-- Destination hands originating from current node -->
+                    @if (values[currentStep.NodeIndex].HasValue)
+                    {
+                        int stepVal = values[currentStep.NodeIndex]!.Value;
+                        int cwTarget = (currentStep.NodeIndex + stepVal) % clockSize;
+                        int ccwTarget = (currentStep.NodeIndex - stepVal % clockSize + clockSize) % clockSize;
+
+                        var (cwX, cwY) = GetNodeCoordinates(cwTarget);
+                        var (ccwX, ccwY) = GetNodeCoordinates(ccwTarget);
+
+                        <!-- CW hand/arc -->
+                        <line x1="@currX.ToString("F1")" y1="@currY.ToString("F1")"
+                              x2="@cwX.ToString("F1")" y2="@cwY.ToString("F1")"
+                              stroke="#00f0ff" stroke-width="2.5" opacity="0.85"
+                              marker-end="url(#arrow-cw)" filter="url(#glow-cyan)" />
+
+                        <!-- CCW hand/arc if different -->
+                        @if (cwTarget != ccwTarget)
+                        {
+                            <line x1="@currX.ToString("F1")" y1="@currY.ToString("F1")"
+                                  x2="@ccwX.ToString("F1")" y2="@ccwY.ToString("F1")"
+                                  stroke="#c084fc" stroke-width="2" opacity="0.75"
+                                  marker-end="url(#arrow-subtle)" stroke-dasharray="3,3" />
+                        }
+                    }
+                }
+
+                <!-- Clock Nodes / Spots -->
+                @for (int i = 0; i < clockSize; i++)
+                {
+                    int index = i;
+                    var (x, y) = GetNodeCoordinates(index);
+                    int? val = values[index];
+                    bool isSelected = selectedIndex == index;
+                    bool isActiveStep = CurrentActiveStep?.NodeIndex == index;
+                    int? stepOrder = CurrentActiveSolution?.StepOrderPerNode[index];
+                    bool isVisitedInPlayback = stepOrder.HasValue && CurrentActiveStep != null && stepOrder.Value < CurrentActiveStep.StepNumber;
+
+                    <g class="clock-node @(isSelected ? "selected" : "") @(isActiveStep ? "active-step" : "") @(isVisitedInPlayback ? "visited-past" : "")"
+                       @onclick="() => SelectNode(index)">
+                        
+                        <!-- Base Node Circle -->
+                        <circle class="outer" cx="@x.ToString("F1")" cy="@y.ToString("F1")" r="22"
+                                fill="@(isActiveStep ? "#291b00" : (isSelected ? "#092237" : "#131b2e"))"
+                                stroke="@(isActiveStep ? "#ffbe0b" : (isSelected ? "#00f0ff" : "#2d3e63"))" />
+
+                        <!-- Node Value Text -->
+                        @((MarkupString)$"<text class=\"node-value-text\" x=\"{x:F1}\" y=\"{(y + 1):F1}\">{(val.HasValue ? val.Value.ToString() : "•")}</text>")
+
+                        <!-- Step Order Badge if solved -->
+                        @if (stepOrder.HasValue)
+                        {
+                            double badgeX = x + 16;
+                            double badgeY = y - 16;
+                            <circle cx="@badgeX.ToString("F1")" cy="@badgeY.ToString("F1")" r="9.5"
+                                    fill="@(isActiveStep ? "#ffbe0b" : (isVisitedInPlayback ? "#475569" : "#00f0ff"))" />
+                            @((MarkupString)$"<text class=\"node-badge-text\" x=\"{badgeX:F1}\" y=\"{(badgeY + 0.5):F1}\">{stepOrder.Value}</text>")
+                        }
+                    </g>
+                }
+            </svg>
+
+            <!-- Active Spot Label & Position Helper -->
+            <div class="mt-2 text-center">
+                <span class="text-secondary small">
+                    Selected: <strong>@(selectedIndex + 1) of @clockSize</strong> (@ClockStep.FormatPosition(selectedIndex, clockSize))
+                </span>
+            </div>
+        </div>
+
+        <!-- Right: Controls, Keypad & Solution Walkthrough -->
+        <div class="controls-column">
+            
+            <!-- Clock Size Selector -->
+            <div class="card-panel">
+                <div class="section-title">
+                    <span>Clock Size</span>
+                    <span class="text-muted small">@clockSize spots</span>
+                </div>
+                <div class="size-pill-row">
+                    @foreach (int size in QuickSizes)
+                    {
+                        <button class="pill-btn @(clockSize == size ? "active" : "")"
+                                @onclick="() => SetClockSize(size)">
+                            @size
+                        </button>
+                    }
+                    <button class="pill-btn" @onclick="DecrementSize" title="Decrease spots">−</button>
+                    <button class="pill-btn" @onclick="IncrementSize" title="Increase spots">+</button>
+                </div>
+            </div>
+
+            <!-- Fast Phone Keypad -->
+            <div class="card-panel">
+                <div class="section-title">
+                    <span>Fast Keypad</span>
+                    <label class="d-flex align-items-center gap-1 text-muted small" style="cursor: pointer;">
+                        <input type="checkbox" @bind="autoSolve" /> Auto-Solve
+                    </label>
+                </div>
+
+                <div class="keypad-grid">
+                    @for (int num = 1; num <= MaxKeypadDigit; num++)
+                    {
+                        int digit = num;
+                        <button class="keypad-btn" @onclick="() => InputDigit(digit)">
+                            @digit
+                        </button>
+                    }
+                    <button class="keypad-btn action-btn" @onclick="HandleBackspace" title="Backspace">
+                        ⌫
+                    </button>
+                    <button class="keypad-btn action-btn" @onclick="MoveSelectionPrev" title="Previous spot">
+                        ◀
+                    </button>
+                    <button class="keypad-btn action-btn" @onclick="MoveSelectionNext" title="Next spot">
+                        ▶
+                    </button>
+                    <button class="keypad-btn solve-btn" @onclick="SolveManual" title="Solve puzzle">
+                        ⚡ Solve
+                    </button>
+                </div>
+
+                <!-- Text quick-entry accordion -->
+                <div class="quick-input-box">
+                    <input type="text" class="quick-text-input" placeholder="Or paste digits: 1 2 3 1 2 2"
+                           @bind="quickInputText" @bind:after="OnQuickInputChanged" />
+                    <button class="btn-sm-subtle" @onclick="ClearAll">Clear</button>
+                </div>
+            </div>
+
+            <!-- Solution Walkthrough Card -->
+            @if (solverResult != null)
+            {
+                <div class="solution-card">
+                    @if (solverResult.Success && CurrentActiveSolution != null)
+                    {
+                        <div class="solution-header">
+                            <span class="solution-badge">Solved in @solverResult.Elapsed.TotalMilliseconds.ToString("F1")ms</span>
+                            
+                            @if (solverResult.Solutions.Count > 1)
+                            {
+                                <div class="d-flex align-items-center gap-1">
+                                    <button class="btn-sm-subtle" @onclick="PrevSolution" disabled="@(currentSolutionIndex == 0)">◀</button>
+                                    <span class="small text-secondary">@(currentSolutionIndex + 1)/@solverResult.Solutions.Count</span>
+                                    <button class="btn-sm-subtle" @onclick="NextSolution" disabled="@(currentSolutionIndex >= solverResult.Solutions.Count - 1)">▶</button>
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Current Step Banner -->
+                        @if (CurrentActiveStep != null)
+                        {
+                            <div class="step-banner">
+                                <div class="step-banner-num">Step @CurrentActiveStep.StepNumber of @CurrentActiveSolution.TotalSteps</div>
+                                <div class="step-banner-desc">@CurrentActiveStep.GetInstruction(clockSize)</div>
+                            </div>
+                        }
+
+                        <!-- Step Walkthrough Controls -->
+                        <div class="walkthrough-ctrls">
+                            <button class="ctrl-btn" @onclick="FirstStep" disabled="@(currentStepIndex == 0)">⏮</button>
+                            <button class="ctrl-btn" @onclick="PrevStep" disabled="@(currentStepIndex == 0)">◀ Prev</button>
+                            <button class="ctrl-btn @(isAutoPlaying ? "play-btn" : "")" @onclick="ToggleAutoPlay">
+                                @(isAutoPlaying ? "⏸ Pause" : "▶ Play")
+                            </button>
+                            <button class="ctrl-btn" @onclick="NextStep" disabled="@(currentStepIndex >= CurrentActiveSolution.TotalSteps - 1)">Next ▶</button>
+                            <button class="ctrl-btn" @onclick="LastStep" disabled="@(currentStepIndex >= CurrentActiveSolution.TotalSteps - 1)">⏭</button>
+                        </div>
+
+                        <!-- Sequence Chips -->
+                        <div class="step-sequence-list">
+                            @for (int s = 0; s < CurrentActiveSolution.Steps.Count; s++)
+                            {
+                                int stepIdx = s;
+                                var step = CurrentActiveSolution.Steps[stepIdx];
+                                bool isCur = currentStepIndex == stepIdx;
+                                bool isPast = currentStepIndex > stepIdx;
+                                <div class="step-chip @(isCur ? "active" : "") @(isPast ? "visited" : "")"
+                                     @onclick="() => JumpToStep(stepIdx)">
+                                    <strong>#@step.StepNumber:</strong>
+                                    <span>Spot @(step.NodeIndex + 1)</span>
+                                    <span class="text-muted">(@step.Value)</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert-box alert-danger">
+                            <span>⚠️ @(solverResult.Message ?? "No solution found. Check the values on the clock.")</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private int clockSize = 6;
+    private int?[] values = new int?[6];
+    private int selectedIndex = 0;
+    private bool autoSolve = true;
+    private string quickInputText = "";
+
+    private SolverResult? solverResult;
+    private int currentSolutionIndex = 0;
+    private int currentStepIndex = 0;
+    private bool isAutoPlaying = false;
+    private CancellationTokenSource? autoPlayCts;
+
+    private static readonly int[] QuickSizes = [5, 6, 7, 8, 9, 10, 11, 12, 13];
+
+    private int MaxKeypadDigit => Math.Max(4, Math.Min(9, clockSize - 1));
+
+    private ClockSolution? CurrentActiveSolution =>
+        solverResult?.Success == true && currentSolutionIndex >= 0 && currentSolutionIndex < solverResult.Solutions.Count
+            ? solverResult.Solutions[currentSolutionIndex]
+            : null;
+
+    private ClockStep? CurrentActiveStep =>
+        CurrentActiveSolution != null && currentStepIndex >= 0 && currentStepIndex < CurrentActiveSolution.Steps.Count
+            ? CurrentActiveSolution.Steps[currentStepIndex]
+            : null;
+
+    protected override void OnInitialized()
+    {
+        // Start fresh with an empty clock, ready for user input
+        ClearAll();
+    }
+
+    private void SetClockSize(int newSize)
+    {
+        if (newSize < 3) newSize = 3;
+        if (newSize > 24) newSize = 24;
+        if (newSize == clockSize) return;
+
+        StopAutoPlay();
+        int?[] newValues = new int?[newSize];
+        int copyCount = Math.Min(newSize, clockSize);
+        for (int i = 0; i < copyCount; i++)
+        {
+            newValues[i] = values[i];
+        }
+
+        clockSize = newSize;
+        values = newValues;
+        if (selectedIndex >= clockSize)
+        {
+            selectedIndex = 0;
+        }
+
+        solverResult = null;
+        if (autoSolve && AreAllValuesFilled())
+        {
+            SolveManual();
+        }
+    }
+
+    private void IncrementSize() => SetClockSize(clockSize + 1);
+    private void DecrementSize() => SetClockSize(clockSize - 1);
+
+    private void SelectNode(int index)
+    {
+        if (index >= 0 && index < clockSize)
+        {
+            selectedIndex = index;
+        }
+    }
+
+    private void MoveSelectionNext()
+    {
+        selectedIndex = (selectedIndex + 1) % clockSize;
+    }
+
+    private void MoveSelectionPrev()
+    {
+        selectedIndex = (selectedIndex - 1 + clockSize) % clockSize;
+    }
+
+    private void InputDigit(int digit)
+    {
+        values[selectedIndex] = digit;
+
+        if (AreAllValuesFilled() && autoSolve)
+        {
+            SolveManual();
+        }
+        else
+        {
+            MoveSelectionNext();
+        }
+    }
+
+    private void HandleBackspace()
+    {
+        values[selectedIndex] = null;
+        MoveSelectionPrev();
+        solverResult = null;
+    }
+
+    private void ClearAll()
+    {
+        StopAutoPlay();
+        values = new int?[clockSize];
+        selectedIndex = 0;
+        solverResult = null;
+        quickInputText = "";
+    }
+
+    private void FillRandomPuzzle()
+    {
+        StopAutoPlay();
+        int[] puzzle = PuzzleGenerator.GenerateSolvablePuzzle(clockSize);
+        values = puzzle.Cast<int?>().ToArray();
+        selectedIndex = 0;
+        quickInputText = string.Join(" ", puzzle);
+        solverResult = null; // Do NOT present solution immediately
+    }
+
+    private void OnQuickInputChanged()
+    {
+        if (string.IsNullOrWhiteSpace(quickInputText)) return;
+
+        // Try extracting integers
+        var matches = System.Text.RegularExpressions.Regex.Matches(quickInputText, @"\d+");
+        if (matches.Count >= 3)
+        {
+            SetClockSize(matches.Count);
+            for (int i = 0; i < matches.Count; i++)
+            {
+                if (int.TryParse(matches[i].Value, out int v))
+                {
+                    values[i] = v;
+                }
+            }
+            if (autoSolve && AreAllValuesFilled())
+            {
+                SolveManual();
+            }
+        }
+    }
+
+    private bool AreAllValuesFilled()
+    {
+        return values.All(v => v.HasValue && v.Value > 0);
+    }
+
+    private void SolveManual()
+    {
+        StopAutoPlay();
+        if (!AreAllValuesFilled())
+        {
+            solverResult = SolverResult.Failed("Please fill all clock spots before solving.");
+            return;
+        }
+
+        int[] nonNullValues = values.Select(v => v!.Value).ToArray();
+        solverResult = ClockSolver.SolveAll(nonNullValues);
+        currentSolutionIndex = 0;
+        currentStepIndex = 0;
+    }
+
+    private (double X, double Y) GetNodeCoordinates(int index)
+    {
+        double radius = clockSize > 12 ? 128 : 120;
+        double angle = index * (Math.PI * 2.0 / clockSize);
+        double x = radius * Math.Sin(angle);
+        double y = -radius * Math.Cos(angle);
+        return (x, y);
+    }
+
+    private void NextStep()
+    {
+        if (CurrentActiveSolution != null && currentStepIndex < CurrentActiveSolution.TotalSteps - 1)
+        {
+            currentStepIndex++;
+        }
+    }
+
+    private void PrevStep()
+    {
+        if (currentStepIndex > 0)
+        {
+            currentStepIndex--;
+        }
+    }
+
+    private void FirstStep() => currentStepIndex = 0;
+
+    private void LastStep()
+    {
+        if (CurrentActiveSolution != null)
+        {
+            currentStepIndex = CurrentActiveSolution.TotalSteps - 1;
+        }
+    }
+
+    private void JumpToStep(int index)
+    {
+        if (CurrentActiveSolution != null && index >= 0 && index < CurrentActiveSolution.TotalSteps)
+        {
+            currentStepIndex = index;
+        }
+    }
+
+    private void NextSolution()
+    {
+        if (solverResult != null && currentSolutionIndex < solverResult.Solutions.Count - 1)
+        {
+            currentSolutionIndex++;
+            currentStepIndex = 0;
+        }
+    }
+
+    private void PrevSolution()
+    {
+        if (currentSolutionIndex > 0)
+        {
+            currentSolutionIndex--;
+            currentStepIndex = 0;
+        }
+    }
+
+    private async Task ToggleAutoPlay()
+    {
+        if (isAutoPlaying)
+        {
+            StopAutoPlay();
+            return;
+        }
+
+        if (CurrentActiveSolution == null) return;
+
+        isAutoPlaying = true;
+        autoPlayCts = new CancellationTokenSource();
+        var token = autoPlayCts.Token;
+
+        try
+        {
+            while (!token.IsCancellationRequested)
+            {
+                if (currentStepIndex >= CurrentActiveSolution.TotalSteps - 1)
+                {
+                    // Reached end; loop back to start or pause
+                    await Task.Delay(1400, token);
+                    currentStepIndex = 0;
+                }
+                else
+                {
+                    currentStepIndex++;
+                }
+
+                StateHasChanged();
+                await Task.Delay(1200, token);
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            // Clean exit
+        }
+        finally
+        {
+            isAutoPlaying = false;
+            StateHasChanged();
+        }
+    }
+
+    private void StopAutoPlay()
+    {
+        if (autoPlayCts != null)
+        {
+            autoPlayCts.Cancel();
+            autoPlayCts.Dispose();
+            autoPlayCts = null;
+        }
+        isAutoPlaying = false;
+    }
+
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (int.TryParse(e.Key, out int digit) && digit >= 1 && digit <= MaxKeypadDigit)
+        {
+            InputDigit(digit);
+        }
+        else if (e.Key == "Backspace")
+        {
+            HandleBackspace();
+        }
+        else if (e.Key == "ArrowRight")
+        {
+            MoveSelectionNext();
+        }
+        else if (e.Key == "ArrowLeft")
+        {
+            MoveSelectionPrev();
+        }
+    }
+
+    public void Dispose()
+    {
+        StopAutoPlay();
+    }
+}

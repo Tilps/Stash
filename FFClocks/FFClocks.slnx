@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="FFClocks.Core/FFClocks.Core.csproj" />
+  <Project Path="FFClocks.Tests/FFClocks.Tests.csproj" />
+  <Project Path="FFClocks.Web/FFClocks.Web.csproj" />
+</Solution>
+

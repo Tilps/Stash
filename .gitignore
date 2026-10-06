@@ -231,3 +231,12 @@ $RECYCLE.BIN/
 *.lnk
 LOTROUtils/LOTROChat/LOTROChat/agsXMPP.dll
 LOTROUtils/LOTROChat/LOTROChat/agsXMPP.xml
+
+# Publish, deployment & local scripts
+[Pp]ublish/
+**/[Pp]ublish/
+[Dd]ist/
+**/[Dd]ist/
+*.tar.gz
+[Ll]ocalscripts/
+**/[Ll]ocalscripts/

@@ -1,0 +1,16 @@
+<IfModule mod_mime.c>
+  AddType application/wasm .wasm
+  AddType application/octet-stream .clr
+  AddType application/octet-stream .dat
+  AddType application/json .json
+</IfModule>
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /ffclocks/
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /ffclocks/index.html [L]
+</IfModule>
+
