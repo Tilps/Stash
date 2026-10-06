@@ -228,4 +228,71 @@ public class BoardTests
             Assert.Equal(SolveState.Solved, solution.State);
         }
     }
+
+    [Fact]
+    public void SolveWithRating_GatheredSudoku112_ClassifiesPatternsAndProducesArrows()
+    {
+        string dir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "GatheredSudokus"));
+        if (!Directory.Exists(dir))
+        {
+            dir = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "GatheredSudokus"));
+        }
+        string p1Path = Path.Combine(dir, "1.1.2.txt");
+        if (!File.Exists(p1Path)) return;
+
+        var lines = File.ReadLines(p1Path).Take(11);
+        var board = Board.Parse(string.Join("\n", lines));
+        board.MaxLookahead = 2;
+        var sol = board.SolveWithRating();
+
+        Assert.Equal(SolveState.Solved, sol.State);
+        Assert.True(sol.IsSuccess);
+
+        // Check that patterns were classified into PointingPair/BoxLineReduction/NakedPair/ForcingChain
+        var types = sol.Steps.Select(s => s.Type).ToHashSet();
+        Assert.Contains(DeductionType.PointingPair, types);
+        Assert.Contains(DeductionType.BoxLineReduction, types);
+        Assert.Contains(DeductionType.NakedPair, types);
+        Assert.Contains(DeductionType.ForcingChain, types);
+
+        // Check arrows on steps
+        var stepsWithArrows = sol.Steps.Where(s => s.Arrows != null && s.Arrows.Count > 0).ToList();
+        Assert.NotEmpty(stepsWithArrows);
+        foreach (var step in stepsWithArrows)
+        {
+            foreach (var arrow in step.Arrows!)
+            {
+                Assert.InRange(arrow.FromRow, 0, 8);
+                Assert.InRange(arrow.FromCol, 0, 8);
+                Assert.InRange(arrow.ToRow, 0, 8);
+                Assert.InRange(arrow.ToCol, 0, 8);
+                Assert.False(string.IsNullOrWhiteSpace(arrow.Color));
+            }
+        }
+    }
+
+    [Fact]
+    public void SolveWithRating_GatheredSudoku122_SolvesSuccessfullyWithExplanations()
+    {
+        string dir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "GatheredSudokus"));
+        if (!Directory.Exists(dir))
+        {
+            dir = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "GatheredSudokus"));
+        }
+        string pPath = Path.Combine(dir, "1.2.2.txt");
+        if (!File.Exists(pPath)) return;
+
+        var lines = File.ReadLines(pPath).Take(11);
+        var board = Board.Parse(string.Join("\n", lines));
+        board.MaxLookahead = 2;
+        var sol = board.SolveWithRating();
+
+        Assert.Equal(SolveState.Solved, sol.State);
+        Assert.True(sol.IsSuccess);
+        Assert.NotEmpty(sol.Steps);
+        foreach (var step in sol.Steps)
+        {
+            Assert.False(string.IsNullOrWhiteSpace(step.Explanation));
+        }
+    }
 }

@@ -163,6 +163,59 @@
                         }
                     }
                 </div>
+
+                @if (activeStep?.Arrows != null && activeStep.Arrows.Count > 0)
+                {
+                    <svg class="board-arrow-overlay" viewBox="0 0 @(width * 100) @(width * 100)" preserveAspectRatio="none">
+                        <defs>
+                            <marker id="arrowhead-sky" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
+                                <polygon points="0 0, 9 3.5, 0 7" fill="#38bdf8" />
+                            </marker>
+                            <marker id="arrowhead-purple" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
+                                <polygon points="0 0, 9 3.5, 0 7" fill="#a855f7" />
+                            </marker>
+                            <marker id="arrowhead-emerald" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
+                                <polygon points="0 0, 9 3.5, 0 7" fill="#10b981" />
+                            </marker>
+                            <marker id="arrowhead-amber" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
+                                <polygon points="0 0, 9 3.5, 0 7" fill="#f59e0b" />
+                            </marker>
+                            <marker id="arrowhead-red" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
+                                <polygon points="0 0, 9 3.5, 0 7" fill="#ef4444" />
+                            </marker>
+                            <marker id="arrowhead-pink" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
+                                <polygon points="0 0, 9 3.5, 0 7" fill="#ec4899" />
+                            </marker>
+                        </defs>
+
+                        @foreach (var arrow in activeStep.Arrows)
+                        {
+                            var coords = ComputeArrowCoords(arrow.FromRow, arrow.FromCol, arrow.ToRow, arrow.ToCol);
+                            string markerId = GetArrowMarkerId(arrow.Color);
+
+                            <line x1="@coords.X1" y1="@coords.Y1" x2="@coords.X2" y2="@coords.Y2"
+                                  stroke="@arrow.Color" stroke-width="3.5"
+                                  stroke-linecap="round"
+                                  stroke-dasharray="6,3"
+                                  marker-end="url(#@markerId)"
+                                  class="animated-arrow-line" />
+
+                            @if (!string.IsNullOrWhiteSpace(arrow.Label))
+                            {
+                                double mx = (coords.X1 + coords.X2) / 2.0;
+                                double my = (coords.Y1 + coords.Y2) / 2.0;
+                                <g class="arrow-label-group">
+                                    <rect x="@(mx - 28)" y="@(my - 11)" width="56" height="20" rx="4"
+                                          fill="#0f172a" stroke="@arrow.Color" stroke-width="1.5" />
+                                    <text x="@mx" y="@(my + 1)" fill="#f1f5f9" font-size="11" font-weight="700"
+                                          text-anchor="middle" dominant-baseline="middle">
+                                        @arrow.Label
+                                    </text>
+                                </g>
+                            }
+                        }
+                    </svg>
+                }
             </div>
 
             <!-- Numpad Keypad -->
@@ -264,7 +317,7 @@
                         <div class="active-step-card">
                             <div class="step-meta">
                                 <span class="step-number-tag">Step #@activeStep.StepNumber</span>
-                                <span class="step-type-tag">@(activeStep.IsElimination ? "Elimination" : "Placement")</span>
+                                <span class="step-type-tag @GetStepTypeBadgeClass(activeStep.Type)">@GetFriendlyTypeName(activeStep.Type)</span>
                                 <span class="toolbar-label">@activeStep.GroupDescription</span>
                             </div>
                             <p class="step-explanation-text">
@@ -294,7 +347,7 @@
                             <div class="step-row-item @(isCurrent ? "current" : "")" @onclick="() => GoToStep(idx)">
                                 <span class="step-number-tag" style="font-size: 0.7rem;">#@s.StepNumber</span>
                                 <span class="step-row-text">@s.Explanation</span>
-                                <span class="step-type-tag" style="font-size: 0.65rem;">@(s.IsElimination ? "Elim" : "Place")</span>
+                                <span class="step-type-tag @GetStepTypeBadgeClass(s.Type)" style="font-size: 0.65rem;">@GetFriendlyTypeName(s.Type)</span>
                             </div>
                         }
                     </div>
@@ -812,6 +865,11 @@
 
     private bool IsInStepGroup(DeductionStep step, int r, int c)
     {
+        if (step.HighlightCells != null && step.HighlightCells.Any(cell => cell.Row == r && cell.Col == c))
+        {
+            return true;
+        }
+
         return step.Type switch
         {
             DeductionType.HiddenSingleRow => r == step.Row,
@@ -820,6 +878,75 @@
             _ => false
         };
     }
+
+    private (double X1, double Y1, double X2, double Y2) ComputeArrowCoords(int fromR, int fromC, int toR, int toC)
+    {
+        double c1X = fromC * 100.0 + 50.0;
+        double c1Y = fromR * 100.0 + 50.0;
+        double c2X = toC * 100.0 + 50.0;
+        double c2Y = toR * 100.0 + 50.0;
+
+        double dx = c2X - c1X;
+        double dy = c2Y - c1Y;
+        double len = Math.Sqrt(dx * dx + dy * dy);
+
+        if (len > 0)
+        {
+            double startX = c1X + (dx / len) * 26.0;
+            double startY = c1Y + (dy / len) * 26.0;
+            double endX = c2X - (dx / len) * 32.0;
+            double endY = c2Y - (dy / len) * 32.0;
+            return (startX, startY, endX, endY);
+        }
+
+        return (c1X, c1Y, c2X, c2Y);
+    }
+
+    private string GetArrowMarkerId(string color) => color.ToLowerInvariant() switch
+    {
+        "#a855f7" or "purple" => "arrowhead-purple",
+        "#10b981" or "green" or "emerald" => "arrowhead-emerald",
+        "#f59e0b" or "amber" or "yellow" => "arrowhead-amber",
+        "#ef4444" or "red" => "arrowhead-red",
+        "#ec4899" or "pink" => "arrowhead-pink",
+        _ => "arrowhead-sky"
+    };
+
+    private string GetFriendlyTypeName(DeductionType type) => type switch
+    {
+        DeductionType.NakedSingle => "Naked Single",
+        DeductionType.HiddenSingleRow => "Hidden Single (Row)",
+        DeductionType.HiddenSingleColumn => "Hidden Single (Col)",
+        DeductionType.HiddenSingleBox => "Hidden Single (Box)",
+        DeductionType.DirectPlacement => "Direct Placement",
+        DeductionType.PointingPair => "Pointing Pair",
+        DeductionType.PointingTriple => "Pointing Triple",
+        DeductionType.BoxLineReduction => "Box-Line Reduction",
+        DeductionType.NakedPair => "Naked Pair",
+        DeductionType.NakedTriple => "Naked Triple",
+        DeductionType.NakedQuad => "Naked Quad",
+        DeductionType.HiddenPair => "Hidden Pair",
+        DeductionType.HiddenTriple => "Hidden Triple",
+        DeductionType.XWing => "X-Wing",
+        DeductionType.Swordfish => "Swordfish",
+        DeductionType.Jellyfish => "Jellyfish",
+        DeductionType.XYWing => "XY-Wing",
+        DeductionType.ForcingChain => "Forcing Chain",
+        DeductionType.LookaheadElimination => "Contradiction Chain",
+        _ => type.ToString()
+    };
+
+    private string GetStepTypeBadgeClass(DeductionType type) => type switch
+    {
+        DeductionType.PointingPair or DeductionType.PointingTriple => "badge-pointing",
+        DeductionType.BoxLineReduction => "badge-boxline",
+        DeductionType.NakedPair or DeductionType.NakedTriple or DeductionType.NakedQuad => "badge-naked-subset",
+        DeductionType.HiddenPair or DeductionType.HiddenTriple => "badge-hidden-subset",
+        DeductionType.XWing or DeductionType.Swordfish or DeductionType.Jellyfish => "badge-fish",
+        DeductionType.XYWing => "badge-wing",
+        DeductionType.ForcingChain or DeductionType.LookaheadElimination => "badge-forcing",
+        _ => "badge-placement"
+    };
 
     private void GoToStep(int index)
     {

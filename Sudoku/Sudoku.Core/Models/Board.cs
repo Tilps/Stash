@@ -342,12 +342,13 @@ public class Board
     }
 
     /// <summary>
+    /// <summary>
     /// Performs a lookahead logic branch test with delta-debugging minimization of deductions.
     /// </summary>
-    private SolveState PassPartLookaheadLogic(List<int> ys, List<int> xs, List<int> values, int lookahead, List<DeductionStep>? structuredSteps = null)
+    private SolveState PassPartLookaheadLogic(List<int> branchRows, List<int> branchCols, List<int> values, int lookahead, List<DeductionStep>? structuredSteps = null)
     {
-        Board[] boards = new Board[ys.Count];
-        SolveState[] results = new SolveState[ys.Count];
+        Board[] boards = new Board[branchRows.Count];
+        SolveState[] results = new SolveState[branchRows.Count];
         SolveState result = SolveState.MultipleSolutions;
 
         for (int i = 0; i < boards.Length; i++)
@@ -355,7 +356,7 @@ public class Board
             boards[i] = Clone();
             boards[i].maxLookahead = lookahead - 1;
             boards[i].scoring = 0;
-            boards[i].Set(xs[i], ys[i], values[i] + 1);
+            boards[i].Set(branchRows[i], branchCols[i], values[i] + 1);
 
             if (scoring == 0 || lookahead > 1)
             {
@@ -388,9 +389,9 @@ public class Board
                 }
                 else
                 {
-                    if (possibles[xs[i], ys[i], values[i]])
+                    if (possibles[branchRows[i], branchCols[i], values[i]])
                     {
-                        possibles[xs[i], ys[i], values[i]] = false;
+                        possibles[branchRows[i], branchCols[i], values[i]] = false;
                         result = SolveState.Progressing;
                     }
                 }
@@ -426,9 +427,9 @@ public class Board
 
                                     if (UseLogging)
                                     {
-                                        for (int a = 0; a < xs.Count; a++)
+                                        for (int a = 0; a < branchRows.Count; a++)
                                         {
-                                            log.AppendFormat("({0},{1} {2}) ", xs[a], ys[a], values[a] + 1);
+                                            log.AppendFormat("({0},{1} {2}) ", branchRows[a], branchCols[a], values[a] + 1);
                                         }
                                         if (lookahead <= 1)
                                             log.AppendFormat("Eliminated {0},{1} {2} in {3} steps\n", i, j, k + 1, scoring - 1);
@@ -438,35 +439,35 @@ public class Board
                                         // Step Minimization (Delta-Debugging)
                                         if (scoring > 1)
                                         {
-                                            for (int a = 0; a < xs.Count; a++)
+                                            for (int a = 0; a < branchRows.Count; a++)
                                             {
-                                                List<int> peggedxs = new() { xs[a] };
-                                                List<int> peggedys = new() { ys[a] };
+                                                List<int> peggedRows = new() { branchRows[a] };
+                                                List<int> peggedCols = new() { branchCols[a] };
                                                 List<int> peggedvs = new() { values[a] + 1 };
                                                 List<int> peggedwhen = new() { 0 };
 
                                                 for (int pegged = 0; pegged < scoring - 1; pegged++)
                                                 {
                                                     Board tb = Clone();
-                                                    tb.Apply(peggedxs, peggedys, peggedvs);
+                                                    tb.Apply(peggedRows, peggedCols, peggedvs);
                                                     tb.PassZeroSlow();
 
-                                                    List<int> possiblexs = new(tb.lastxs);
-                                                    List<int> possibleys = new(tb.lastys);
+                                                    List<int> possibleRows = new(tb.lastxs);
+                                                    List<int> possibleCols = new(tb.lastys);
                                                     List<int> possiblevs = new(tb.lastvalues);
-                                                    List<int> bestxs = new(possiblexs);
-                                                    List<int> bestys = new(possibleys);
+                                                    List<int> bestRows = new(possibleRows);
+                                                    List<int> bestCols = new(possibleCols);
                                                     List<int> bestvs = new(possiblevs);
 
                                                     // Prune unnecessary deduction steps from the chain
-                                                    for (int trial = possiblexs.Count - 1; trial >= 0; trial--)
+                                                    for (int trial = possibleRows.Count - 1; trial >= 0; trial--)
                                                     {
                                                         tb = Clone();
-                                                        tb.Apply(peggedxs, peggedys, peggedvs);
-                                                        possiblexs.RemoveAt(trial);
-                                                        possibleys.RemoveAt(trial);
+                                                        tb.Apply(peggedRows, peggedCols, peggedvs);
+                                                        possibleRows.RemoveAt(trial);
+                                                        possibleCols.RemoveAt(trial);
                                                         possiblevs.RemoveAt(trial);
-                                                        tb.Apply(possiblexs, possibleys, possiblevs);
+                                                        tb.Apply(possibleRows, possibleCols, possiblevs);
 
                                                         for (int nextp = pegged + 1; nextp < scoring - 1; nextp++)
                                                         {
@@ -477,21 +478,21 @@ public class Board
                                                         if (tb.possibles[i, j, k])
                                                         {
                                                             // Step was required, revert
-                                                            possiblexs = new(bestxs);
-                                                            possibleys = new(bestys);
+                                                            possibleRows = new(bestRows);
+                                                            possibleCols = new(bestCols);
                                                             possiblevs = new(bestvs);
                                                         }
                                                         else
                                                         {
                                                             // Step was redundant! Keep it pruned
-                                                            bestxs = new(possiblexs);
-                                                            bestys = new(possibleys);
+                                                            bestRows = new(possibleRows);
+                                                            bestCols = new(possibleCols);
                                                             bestvs = new(possiblevs);
                                                         }
                                                     }
 
-                                                    peggedxs.AddRange(bestxs);
-                                                    peggedys.AddRange(bestys);
+                                                    peggedRows.AddRange(bestRows);
+                                                    peggedCols.AddRange(bestCols);
                                                     peggedvs.AddRange(bestvs);
                                                     for (int index = 0; index < bestvs.Count; index++)
                                                     {
@@ -499,16 +500,31 @@ public class Board
                                                     }
                                                 }
 
-                                                log.AppendFormat("Trial ({0},{1} {2}):\n", xs[a], ys[a], values[a] + 1);
-                                                for (int b = 0; b < peggedxs.Count; b++)
+                                                log.AppendFormat("Trial ({0},{1} {2}):\n", branchRows[a], branchCols[a], values[a] + 1);
+                                                proofChain.Add($"Hypothesis {a + 1}: If R{branchRows[a] + 1}C{branchCols[a] + 1} = {FormatValue(values[a] + 1)}:");
+                                                for (int b = 1; b < peggedRows.Count; b++)
                                                 {
-                                                    string chainEntry = $"Step {peggedwhen[b]}: R{peggedxs[b] + 1}C{peggedys[b] + 1}={FormatValue(peggedvs[b])}";
-                                                    proofChain.Add(chainEntry);
-                                                    log.AppendFormat(" {3}: {0}, {1} {2}\n", peggedxs[b], peggedys[b], peggedvs[b], peggedwhen[b]);
+                                                    proofChain.Add($"   → Forces R{peggedRows[b] + 1}C{peggedCols[b] + 1} = {FormatValue(peggedvs[b])}");
+                                                    log.AppendFormat(" {3}: {0}, {1} {2}\n", peggedRows[b], peggedCols[b], peggedvs[b], peggedwhen[b]);
                                                 }
+                                                proofChain.Add($"   → Eliminates candidate {FormatValue(k + 1)} from R{i + 1}C{j + 1}");
                                             }
+                                            proofChain.Add($"Conclusion: All {branchRows.Count} hypotheses eliminate candidate {FormatValue(k + 1)} from R{i + 1}C{j + 1}.");
                                         }
                                     }
+
+                                    var classified = PatternClassifier.Classify(
+                                        this,
+                                        targetRow: i,
+                                        targetCol: j,
+                                        targetVal: k + 1,
+                                        branchRows,
+                                        branchCols,
+                                        values,
+                                        lookaheadDepth: lookahead,
+                                        scoring: scoring,
+                                        rawProofChain: proofChain.Count > 0 ? proofChain : null
+                                    );
 
                                     if (structuredSteps != null && possibles[i, j, k])
                                     {
@@ -517,10 +533,12 @@ public class Board
                                             Row: i,
                                             Col: j,
                                             Value: k + 1,
-                                            Type: DeductionType.LookaheadElimination,
-                                            Explanation: $"Eliminated candidate {FormatValue(k + 1)} from R{i + 1}C{j + 1}: branching logic demonstrates {FormatValue(k + 1)} leads to contradiction.",
-                                            GroupDescription: $"Lookahead Depth {lookahead}",
-                                            ProofChain: proofChain.Count > 0 ? proofChain : null
+                                            Type: classified.Type,
+                                            Explanation: classified.Explanation,
+                                            HighlightCells: classified.InvolvedCells,
+                                            GroupDescription: classified.GroupDescription,
+                                            ProofChain: classified.ProofChain,
+                                            Arrows: classified.Arrows
                                         ));
                                     }
 
@@ -541,8 +559,8 @@ public class Board
 
     private SolveState PassLookaheadLogic(int depth, int lookahead, List<DeductionStep>? structuredSteps = null)
     {
-        List<int> rowSpots = new();
-        List<int> columnSpots = new();
+        List<int> branchRows = new();
+        List<int> branchCols = new();
         List<int> values = new();
         SolveState result = SolveState.MultipleSolutions;
 
@@ -550,20 +568,20 @@ public class Board
         {
             for (int j = 0; j < width; j++)
             {
-                // Column check
-                rowSpots.Clear(); columnSpots.Clear(); values.Clear();
+                // Check across row j for candidate value i
+                branchRows.Clear(); branchCols.Clear(); values.Clear();
                 for (int k = 0; k < width; k++)
                 {
                     if (possibles[j, k, i])
                     {
-                        rowSpots.Add(k);
-                        columnSpots.Add(j);
+                        branchRows.Add(j);
+                        branchCols.Add(k);
                         values.Add(i);
                     }
                 }
-                if (rowSpots.Count == depth)
+                if (branchRows.Count == depth)
                 {
-                    SolveState temp = PassPartLookaheadLogic(rowSpots, columnSpots, values, lookahead, structuredSteps);
+                    SolveState temp = PassPartLookaheadLogic(branchRows, branchCols, values, lookahead, structuredSteps);
                     if (temp == SolveState.Unsolvable || temp == SolveState.DefiniteMultipleSolutions) return temp;
                     if (temp == SolveState.Progressing)
                     {
@@ -572,20 +590,20 @@ public class Board
                     }
                 }
 
-                // Row check
-                rowSpots.Clear(); columnSpots.Clear(); values.Clear();
+                // Check across column j for candidate value i
+                branchRows.Clear(); branchCols.Clear(); values.Clear();
                 for (int k = 0; k < width; k++)
                 {
                     if (possibles[k, j, i])
                     {
-                        rowSpots.Add(j);
-                        columnSpots.Add(k);
+                        branchRows.Add(k);
+                        branchCols.Add(j);
                         values.Add(i);
                     }
                 }
-                if (rowSpots.Count == depth)
+                if (branchRows.Count == depth)
                 {
-                    SolveState temp = PassPartLookaheadLogic(rowSpots, columnSpots, values, lookahead, structuredSteps);
+                    SolveState temp = PassPartLookaheadLogic(branchRows, branchCols, values, lookahead, structuredSteps);
                     if (temp == SolveState.Unsolvable || temp == SolveState.DefiniteMultipleSolutions) return temp;
                     if (temp == SolveState.Progressing)
                     {
@@ -594,8 +612,8 @@ public class Board
                     }
                 }
 
-                // Box check
-                rowSpots.Clear(); columnSpots.Clear(); values.Clear();
+                // Check across box j for candidate value i
+                branchRows.Clear(); branchCols.Clear(); values.Clear();
                 int cx = (j / sizey) * sizey;
                 int cy = (j % sizey) * sizex;
                 for (int k = 0; k < width; k++)
@@ -604,14 +622,14 @@ public class Board
                     int ty = cy + (k % sizex);
                     if (possibles[tx, ty, i])
                     {
-                        columnSpots.Add(tx);
-                        rowSpots.Add(ty);
+                        branchRows.Add(tx);
+                        branchCols.Add(ty);
                         values.Add(i);
                     }
                 }
-                if (rowSpots.Count == depth)
+                if (branchRows.Count == depth)
                 {
-                    SolveState temp = PassPartLookaheadLogic(rowSpots, columnSpots, values, lookahead, structuredSteps);
+                    SolveState temp = PassPartLookaheadLogic(branchRows, branchCols, values, lookahead, structuredSteps);
                     if (temp == SolveState.Unsolvable || temp == SolveState.DefiniteMultipleSolutions) return temp;
                     if (temp == SolveState.Progressing)
                     {
@@ -623,19 +641,19 @@ public class Board
                 // Cell candidates check
                 if (cells[i, j] == 0)
                 {
-                    rowSpots.Clear(); columnSpots.Clear(); values.Clear();
+                    branchRows.Clear(); branchCols.Clear(); values.Clear();
                     for (int k = 0; k < width; k++)
                     {
                         if (possibles[i, j, k])
                         {
-                            columnSpots.Add(i);
-                            rowSpots.Add(j);
+                            branchRows.Add(i);
+                            branchCols.Add(j);
                             values.Add(k);
                         }
                     }
-                    if (rowSpots.Count == depth)
+                    if (branchRows.Count == depth)
                     {
-                        SolveState temp = PassPartLookaheadLogic(rowSpots, columnSpots, values, lookahead, structuredSteps);
+                        SolveState temp = PassPartLookaheadLogic(branchRows, branchCols, values, lookahead, structuredSteps);
                         if (temp == SolveState.Unsolvable || temp == SolveState.DefiniteMultipleSolutions) return temp;
                         if (temp == SolveState.Progressing)
                         {
