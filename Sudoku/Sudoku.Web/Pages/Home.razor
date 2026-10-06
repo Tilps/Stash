@@ -1,0 +1,681 @@
+@page "/"
+@using Sudoku.Core.Models
+@using Sudoku.Core.Generator
+@using Sudoku.Core.Solver
+@implements IDisposable
+
+<div class="sudoku-container" tabindex="0" @onkeydown="HandleKeyDown" @ref="containerRef">
+    <!-- Header -->
+    <header class="app-header">
+        <h1 class="app-title">Sudoku Solver &amp; Explainer</h1>
+        <div class="app-subtitle">
+            Intelligent logic deduction with delta-debugging minimization
+        </div>
+        <div>
+            <span class="badge-feature">Step-by-Step Human Explanations • Exact Cover DLX</span>
+        </div>
+    </header>
+
+    <!-- Top Toolbar -->
+    <div class="toolbar-card">
+        <!-- Preset Selector -->
+        <div class="toolbar-group">
+            <span class="toolbar-label">Preset:</span>
+            <select class="select-dark" @onchange="OnPresetSelected">
+                @for (int i = 0; i < PresetPuzzle.Presets.Count; i++)
+                {
+                    var p = PresetPuzzle.Presets[i];
+                    <option value="@i" selected="@(selectedPresetIndex == i)">@p.Title (@p.Difficulty)</option>
+                }
+            </select>
+        </div>
+
+        <!-- Random Generator -->
+        <div class="toolbar-group">
+            <span class="toolbar-label">Generate:</span>
+            <select class="select-dark" @bind="selectedDifficulty">
+                <option value="@Difficulty.Easy">Easy</option>
+                <option value="@Difficulty.Medium">Medium</option>
+                <option value="@Difficulty.Hard">Hard</option>
+            </select>
+            <button class="btn-tool" @onclick="GeneratePuzzle" disabled="@isGenerating">
+                @(isGenerating ? "Generating..." : "New Puzzle")
+            </button>
+        </div>
+
+        <!-- Utilities -->
+        <div class="toolbar-group">
+            <button class="btn-tool" @onclick="ResetToInitial">Reset</button>
+            <button class="btn-tool" @onclick="ClearAll">Clear Grid</button>
+            <button class="btn-tool" @onclick="() => showImportModal = true">Import / Export</button>
+        </div>
+    </div>
+
+    <!-- Main Workspace -->
+    <div class="sudoku-workspace">
+        <!-- Left Column: Board + Keypad -->
+        <div class="board-column">
+            <!-- 9x9 Grid -->
+            <div class="sudoku-board-container">
+                <div class="sudoku-board">
+                    @for (int r = 0; r < 9; r++)
+                    {
+                        for (int c = 0; c < 9; c++)
+                        {
+                            int row = r;
+                            int col = c;
+                            int val = GetDisplayValue(row, col);
+                            bool isGiven = initialGrid[row, col] != 0;
+                            bool isSelected = selectedRow == row && selectedCol == col;
+                            bool isMatchingNum = selectedVal > 0 && val == selectedVal;
+                            bool isRelated = (selectedRow == row || selectedCol == col || (selectedRow / 3 == row / 3 && selectedCol / 3 == col / 3)) && !isSelected;
+
+                            // Walkthrough highlight
+                            bool isStepTarget = activeStep != null && activeStep.Row == row && activeStep.Col == col;
+                            bool isStepGroup = activeStep != null && IsInStepGroup(activeStep, row, col) && !isStepTarget;
+
+                            string cellClasses = "sudoku-cell";
+                            if (col == 2 || col == 5) cellClasses += " border-right-thick";
+                            if (row == 2 || row == 5) cellClasses += " border-bottom-thick";
+                            if (isSelected) cellClasses += " selected";
+                            else if (isStepTarget) cellClasses += " step-affected-cell";
+                            else if (isStepGroup) cellClasses += " step-affected-group";
+                            else if (isMatchingNum) cellClasses += " matching-number";
+                            else if (isRelated) cellClasses += " related-group";
+
+                            if (isGiven) cellClasses += " clue-cell";
+                            else if (currentSolution != null && val > 0) cellClasses += " solved-cell";
+                            else if (val > 0) cellClasses += " user-cell";
+
+                            <div class="@cellClasses" @onclick="() => SelectCell(row, col)">
+                                @if (val > 0)
+                                {
+                                    @val
+                                }
+                                else if (showCandidates)
+                                {
+                                    <div class="candidates-grid">
+                                        @for (int d = 1; d <= 9; d++)
+                                        {
+                                            bool isCandidate = candidateMarks[row, col, d - 1];
+                                            <div class="candidate-num @(isCandidate ? "active" : "")">
+                                                @(isCandidate ? d.ToString() : "")
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+
+            <!-- Numpad Keypad -->
+            <div class="numpad-container">
+                <div class="numpad-grid">
+                    @for (int d = 1; d <= 9; d++)
+                    {
+                        int digit = d;
+                        <button class="btn-numpad" @onclick="() => InputDigit(digit)">@digit</button>
+                    }
+                </div>
+                <div class="numpad-actions">
+                    <button class="btn-action-pill" @onclick="ClearSelectedCell">
+                        <span>⌫</span> Erase
+                    </button>
+                    <button class="btn-action-pill @(isPencilMode ? "active" : "")" @onclick="() => isPencilMode = !isPencilMode">
+                        <span>✏️</span> Pencil @(isPencilMode ? "ON" : "OFF")
+                    </button>
+                    <button class="btn-action-pill @(showCandidates ? "active" : "")" @onclick="ToggleCandidates">
+                        <span>👁️</span> Candidates @(showCandidates ? "ON" : "OFF")
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Explainer & Controls -->
+        <div class="sidebar-column">
+            <!-- Action Buttons Card -->
+            <div class="actions-card">
+                <button class="btn-explain" @onclick="ExplainSolution" disabled="@isSolving">
+                    <span>✨</span> @(isSolving ? "Analyzing..." : "Explain Solution")
+                </button>
+                <button class="btn-fast-solve" @onclick="FastSolve" disabled="@isSolving">
+                    <span>⚡</span> Fast Solve (DLX)
+                </button>
+            </div>
+
+            <!-- Status Banner -->
+            @if (!string.IsNullOrWhiteSpace(statusMessage))
+            {
+                <div class="stats-banner">
+                    <div class="stat-item">
+                        <span class="stat-label">Status</span>
+                        <span class="stat-value" style="font-size: 0.95rem;">@statusMessage</span>
+                    </div>
+                    @if (currentSolution != null && currentSolution.IsSuccess)
+                    {
+                        <div class="stat-item">
+                            <span class="stat-label">Difficulty</span>
+                            <span class="stat-badge @GetDifficultyBadgeClass(currentSolution)">
+                                Lookahead: @currentSolution.MaxLookaheadUsed (Score: @currentSolution.Score)
+                            </span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Steps</span>
+                            <span class="stat-value">@currentSolution.Steps.Count</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Time</span>
+                            <span class="stat-value">@($"{currentSolution.Elapsed.TotalMilliseconds:F1} ms")</span>
+                        </div>
+                    }
+                </div>
+            }
+
+            <!-- Explanation Walkthrough Card -->
+            @if (currentSolution != null && currentSolution.Steps.Count > 0)
+            {
+                <div class="explainer-card">
+                    <div class="explainer-card-header">
+                        <h2 class="explainer-title">
+                            <span>🔍</span> Solution Walkthrough
+                        </h2>
+                        <span class="toolbar-label">
+                            Step @(currentStepIndex + 1) of @currentSolution.Steps.Count
+                        </span>
+                    </div>
+
+                    <!-- Playback Controls -->
+                    <div class="playback-controls">
+                        <button class="btn-playback" @onclick="FirstStep" disabled="@(currentStepIndex <= 0)" title="First Step">⏮ First</button>
+                        <button class="btn-playback" @onclick="PrevStep" disabled="@(currentStepIndex <= 0)" title="Previous Step">◀ Prev</button>
+                        <button class="btn-playback btn-playback-play" @onclick="TogglePlay">
+                            @(isPlaying ? "⏸ Pause" : "▶ Play")
+                        </button>
+                        <button class="btn-playback" @onclick="NextStep" disabled="@(currentStepIndex >= currentSolution.Steps.Count - 1)" title="Next Step">Next ▶</button>
+                        <button class="btn-playback" @onclick="LastStep" disabled="@(currentStepIndex >= currentSolution.Steps.Count - 1)" title="Last Step">Last ⏭</button>
+                        <select class="speed-select" @bind="playbackSpeedMs">
+                            <option value="300">Fast (0.3s)</option>
+                            <option value="600">Medium (0.6s)</option>
+                            <option value="1000">Normal (1.0s)</option>
+                            <option value="1800">Slow (1.8s)</option>
+                        </select>
+                    </div>
+
+                    <!-- Active Step Highlight Card -->
+                    @if (activeStep != null)
+                    {
+                        <div class="active-step-card">
+                            <div class="step-meta">
+                                <span class="step-number-tag">Step #@activeStep.StepNumber</span>
+                                <span class="step-type-tag">@activeStep.Type</span>
+                                <span class="toolbar-label">@activeStep.GroupDescription</span>
+                            </div>
+                            <p class="step-explanation-text">
+                                @activeStep.Explanation
+                            </p>
+                        </div>
+                    }
+
+                    <!-- Scrollable Steps List -->
+                    <div class="steps-list-container">
+                        @for (int i = 0; i < currentSolution.Steps.Count; i++)
+                        {
+                            int idx = i;
+                            var s = currentSolution.Steps[idx];
+                            bool isCurrent = idx == currentStepIndex;
+                            <div class="step-row-item @(isCurrent ? "current" : "")" @onclick="() => GoToStep(idx)">
+                                <span class="step-number-tag" style="font-size: 0.7rem;">#@s.StepNumber</span>
+                                <span class="step-row-text">@s.Explanation</span>
+                                <span class="step-type-tag" style="font-size: 0.65rem;">@s.Type</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Import / Export Modal -->
+    @if (showImportModal)
+    {
+        <div class="modal-overlay" @onclick="() => showImportModal = false">
+            <div class="modal-dialog-box" @onclick:stopPropagation="true">
+                <h3 class="modal-title">Import / Export Puzzle</h3>
+                <p style="font-size: 0.85rem; color: #94a3b8; margin: 0;">
+                    Paste an 81-character puzzle string (numbers 1-9 and '.' or '0' for blanks):
+                </p>
+                <textarea class="modal-textarea" @bind="importText"></textarea>
+                <div class="modal-actions">
+                    <button class="btn-tool" @onclick="ExportCurrentPuzzle">Export Current</button>
+                    <button class="btn-tool" @onclick="ImportPuzzle">Load Puzzle</button>
+                    <button class="btn-tool" @onclick="() => showImportModal = false">Close</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private ElementReference containerRef;
+    private int[,] initialGrid = new int[9, 9];
+    private int[,] currentGrid = new int[9, 9];
+    private bool[,,] candidateMarks = new bool[9, 9, 9];
+
+    private int selectedRow = -1;
+    private int selectedCol = -1;
+    private int selectedVal => (selectedRow >= 0 && selectedCol >= 0) ? GetDisplayValue(selectedRow, selectedCol) : 0;
+
+    private bool showCandidates = false;
+    private bool isPencilMode = false;
+    private int selectedPresetIndex = 0;
+    private Difficulty selectedDifficulty = Difficulty.Medium;
+
+    private bool isSolving = false;
+    private bool isGenerating = false;
+    private string statusMessage = "Select a puzzle or click 'Explain Solution' to begin.";
+
+    private SudokuSolution? currentSolution;
+    private int currentStepIndex = -1;
+    private DeductionStep? activeStep => (currentSolution != null && currentStepIndex >= 0 && currentStepIndex < currentSolution.Steps.Count)
+        ? currentSolution.Steps[currentStepIndex]
+        : null;
+
+    private bool isPlaying = false;
+    private int playbackSpeedMs = 600;
+    private CancellationTokenSource? playCts;
+
+    private bool showImportModal = false;
+    private string importText = "";
+
+    protected override void OnInitialized()
+    {
+        LoadPreset(PresetPuzzle.Presets[0]);
+    }
+
+    private void OnPresetSelected(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int index) && index >= 0 && index < PresetPuzzle.Presets.Count)
+        {
+            selectedPresetIndex = index;
+            LoadPreset(PresetPuzzle.Presets[index]);
+        }
+    }
+
+    private void LoadPreset(PresetPuzzle preset)
+    {
+        StopPlay();
+        var board = Board.Parse(preset.Clues);
+        initialGrid = board.Cells;
+        currentGrid = (int[,])initialGrid.Clone();
+        candidateMarks = new bool[9, 9, 9];
+        currentSolution = null;
+        currentStepIndex = -1;
+        statusMessage = $"Loaded preset: {preset.Title} ({preset.Difficulty})";
+    }
+
+    private async Task GeneratePuzzle()
+    {
+        StopPlay();
+        isGenerating = true;
+        statusMessage = $"Generating {selectedDifficulty} puzzle with unique solution...";
+        StateHasChanged();
+        await Task.Yield();
+
+        try
+        {
+            var gen = new SudokuGenerator();
+            var board = await Task.Run(() => gen.Generate(selectedDifficulty));
+            initialGrid = board.Cells;
+            currentGrid = (int[,])initialGrid.Clone();
+            candidateMarks = new bool[9, 9, 9];
+            currentSolution = null;
+            currentStepIndex = -1;
+            statusMessage = $"Generated new {selectedDifficulty} puzzle.";
+        }
+        finally
+        {
+            isGenerating = false;
+        }
+    }
+
+    private void ResetToInitial()
+    {
+        StopPlay();
+        currentGrid = (int[,])initialGrid.Clone();
+        candidateMarks = new bool[9, 9, 9];
+        currentSolution = null;
+        currentStepIndex = -1;
+        statusMessage = "Reset to initial clues.";
+    }
+
+    private void ClearAll()
+    {
+        StopPlay();
+        initialGrid = new int[9, 9];
+        currentGrid = new int[9, 9];
+        candidateMarks = new bool[9, 9, 9];
+        currentSolution = null;
+        currentStepIndex = -1;
+        statusMessage = "Grid cleared. You can now enter custom clues.";
+    }
+
+    private void SelectCell(int r, int c)
+    {
+        selectedRow = r;
+        selectedCol = c;
+    }
+
+    private void InputDigit(int digit)
+    {
+        if (selectedRow < 0 || selectedCol < 0) return;
+        if (initialGrid[selectedRow, selectedCol] != 0) return; // Clue cells are immutable
+
+        if (isPencilMode)
+        {
+            candidateMarks[selectedRow, selectedCol, digit - 1] = !candidateMarks[selectedRow, selectedCol, digit - 1];
+        }
+        else
+        {
+            currentGrid[selectedRow, selectedCol] = (currentGrid[selectedRow, selectedCol] == digit) ? 0 : digit;
+            // Clear solution walkthrough if board is edited
+            if (currentSolution != null)
+            {
+                currentSolution = null;
+                currentStepIndex = -1;
+            }
+        }
+    }
+
+    private void ClearSelectedCell()
+    {
+        if (selectedRow < 0 || selectedCol < 0) return;
+        if (initialGrid[selectedRow, selectedCol] != 0) return;
+
+        currentGrid[selectedRow, selectedCol] = 0;
+        for (int d = 0; d < 9; d++) candidateMarks[selectedRow, selectedCol, d] = false;
+
+        if (currentSolution != null)
+        {
+            currentSolution = null;
+            currentStepIndex = -1;
+        }
+    }
+
+    private void ToggleCandidates()
+    {
+        showCandidates = !showCandidates;
+        if (showCandidates)
+        {
+            // Auto-populate pencil marks from logical possibilities if none exist
+            var board = new Board(3, 3);
+            for (int r = 0; r < 9; r++)
+                for (int c = 0; c < 9; c++)
+                    if (currentGrid[r, c] != 0) board.Set(r, c, currentGrid[r, c]);
+
+            for (int r = 0; r < 9; r++)
+            {
+                for (int c = 0; c < 9; c++)
+                {
+                    if (currentGrid[r, c] == 0)
+                    {
+                        var cand = board.GetCandidates(r, c);
+                        for (int d = 1; d <= 9; d++)
+                        {
+                            candidateMarks[r, c, d - 1] = cand.Contains(d);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private async Task ExplainSolution()
+    {
+        StopPlay();
+        isSolving = true;
+        statusMessage = "Analyzing puzzle and generating minimal deduction explanation...";
+        StateHasChanged();
+        await Task.Yield();
+
+        try
+        {
+            var board = new Board(3, 3) { MaxLookahead = 2 };
+            for (int r = 0; r < 9; r++)
+            {
+                for (int c = 0; c < 9; c++)
+                {
+                    if (currentGrid[r, c] != 0) board.Set(r, c, currentGrid[r, c]);
+                }
+            }
+
+            var solution = await Task.Run(() => board.SolveWithRating());
+            currentSolution = solution;
+
+            if (solution.IsSuccess)
+            {
+                currentStepIndex = 0;
+                statusMessage = $"Puzzle solved logically in {solution.Steps.Count} steps! (Lookahead: {solution.MaxLookaheadUsed})";
+            }
+            else if (solution.State == SolveState.MultipleSolutions)
+            {
+                statusMessage = "Puzzle has multiple possible solutions or requires deeper search.";
+            }
+            else
+            {
+                statusMessage = "Puzzle is unsolvable (contains contradictory clues).";
+            }
+        }
+        finally
+        {
+            isSolving = false;
+        }
+    }
+
+    private void FastSolve()
+    {
+        StopPlay();
+        var board = new Board(3, 3);
+        for (int r = 0; r < 9; r++)
+        {
+            for (int c = 0; c < 9; c++)
+            {
+                if (currentGrid[r, c] != 0) board.Set(r, c, currentGrid[r, c]);
+            }
+        }
+
+        var solution = board.SolveFast();
+        if (solution.IsSuccess)
+        {
+            currentGrid = (int[,])solution.SolvedGrid.Clone();
+            currentSolution = null;
+            currentStepIndex = -1;
+            statusMessage = $"Solved instantly via Knuth's Dancing Links (DLX) in {solution.Elapsed.TotalMilliseconds:F2} ms.";
+        }
+        else if (solution.State == SolveState.MultipleSolutions)
+        {
+            statusMessage = "DLX found multiple solutions for this puzzle.";
+        }
+        else
+        {
+            statusMessage = "DLX determined this puzzle is unsolvable.";
+        }
+    }
+
+    private int GetDisplayValue(int r, int c)
+    {
+        if (currentSolution != null && currentStepIndex >= 0 && currentSolution.Steps.Count > 0)
+        {
+            if (initialGrid[r, c] != 0) return initialGrid[r, c];
+            for (int i = 0; i <= currentStepIndex; i++)
+            {
+                var s = currentSolution.Steps[i];
+                if (s.Row == r && s.Col == c) return s.Value;
+            }
+            return 0;
+        }
+        return currentGrid[r, c];
+    }
+
+    private bool IsInStepGroup(DeductionStep step, int r, int c)
+    {
+        return step.Type switch
+        {
+            DeductionType.HiddenSingleRow => r == step.Row,
+            DeductionType.HiddenSingleColumn => c == step.Col,
+            DeductionType.HiddenSingleBox => (r / 3 == step.Row / 3) && (c / 3 == step.Col / 3),
+            _ => false
+        };
+    }
+
+    private void GoToStep(int index)
+    {
+        if (currentSolution == null) return;
+        currentStepIndex = Math.Clamp(index, 0, currentSolution.Steps.Count - 1);
+        if (activeStep != null)
+        {
+            selectedRow = activeStep.Row;
+            selectedCol = activeStep.Col;
+        }
+    }
+
+    private void NextStep()
+    {
+        if (currentSolution == null || currentStepIndex >= currentSolution.Steps.Count - 1) return;
+        GoToStep(currentStepIndex + 1);
+    }
+
+    private void PrevStep()
+    {
+        if (currentSolution == null || currentStepIndex <= 0) return;
+        GoToStep(currentStepIndex - 1);
+    }
+
+    private void FirstStep() => GoToStep(0);
+    private void LastStep()
+    {
+        if (currentSolution != null) GoToStep(currentSolution.Steps.Count - 1);
+    }
+
+    private void TogglePlay()
+    {
+        if (isPlaying)
+        {
+            StopPlay();
+        }
+        else
+        {
+            StartPlay();
+        }
+    }
+
+    private void StartPlay()
+    {
+        if (currentSolution == null || currentSolution.Steps.Count == 0) return;
+        isPlaying = true;
+        playCts = new CancellationTokenSource();
+        var token = playCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            while (!token.IsCancellationRequested && isPlaying)
+            {
+                await Task.Delay(playbackSpeedMs, token);
+                await InvokeAsync(() =>
+                {
+                    if (currentStepIndex < currentSolution.Steps.Count - 1)
+                    {
+                        NextStep();
+                        StateHasChanged();
+                    }
+                    else
+                    {
+                        StopPlay();
+                        StateHasChanged();
+                    }
+                });
+            }
+        }, token);
+    }
+
+    private void StopPlay()
+    {
+        isPlaying = false;
+        playCts?.Cancel();
+        playCts = null;
+    }
+
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "ArrowUp":
+                if (selectedRow > 0) selectedRow--;
+                break;
+            case "ArrowDown":
+                if (selectedRow < 8) selectedRow++;
+                break;
+            case "ArrowLeft":
+                if (selectedCol > 0) selectedCol--;
+                break;
+            case "ArrowRight":
+                if (selectedCol < 8) selectedCol++;
+                break;
+            case "1" or "2" or "3" or "4" or "5" or "6" or "7" or "8" or "9":
+                InputDigit(int.Parse(e.Key));
+                break;
+            case "Backspace" or "Delete" or "0":
+                ClearSelectedCell();
+                break;
+            case "p" or "P":
+                isPencilMode = !isPencilMode;
+                break;
+            case "c" or "C":
+                ToggleCandidates();
+                break;
+            case " ":
+                if (currentSolution != null) NextStep();
+                break;
+        }
+    }
+
+    private void ExportCurrentPuzzle()
+    {
+        var board = new Board(3, 3);
+        for (int r = 0; r < 9; r++)
+            for (int c = 0; c < 9; c++)
+                if (currentGrid[r, c] != 0) board.Set(r, c, currentGrid[r, c]);
+        importText = board.ToSimpleString();
+    }
+
+    private void ImportPuzzle()
+    {
+        if (!string.IsNullOrWhiteSpace(importText))
+        {
+            var board = Board.Parse(importText);
+            initialGrid = board.Cells;
+            currentGrid = (int[,])initialGrid.Clone();
+            candidateMarks = new bool[9, 9, 9];
+            currentSolution = null;
+            currentStepIndex = -1;
+            statusMessage = "Puzzle imported successfully.";
+            showImportModal = false;
+        }
+    }
+
+    private string GetDifficultyBadgeClass(SudokuSolution sol)
+    {
+        return sol.MaxLookaheadUsed switch
+        {
+            0 => "badge-easy",
+            1 => "badge-medium",
+            _ => "badge-hard"
+        };
+    }
+
+    public void Dispose()
+    {
+        StopPlay();
+    }
+}
