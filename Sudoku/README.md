@@ -33,3 +33,7 @@ To run the web app locally:
 dotnet run --project Sudoku.Web/Sudoku.Web.csproj
 ```
 Then navigate to `http://localhost:5000` (or the reported local port).
+
+## Investigation Backlog
+
+- **Minimal Upper Bound for Difficulty Rating**: When re-evaluating gathered puzzles after adding unit subset logic, 37 puzzles became easier, but 4 puzzles shifted to slightly higher ratings (`1.4.2` #63, `1.4.3` #33, `1.4.3` #56, `1.4.4` #35). This suggests greedy deduction application may occasionally make earlier progress that alters candidates in a way that prevents finding the global minimal upper-bound difficulty path. Investigate branch-point divergence and minimal bottleneck path search.
