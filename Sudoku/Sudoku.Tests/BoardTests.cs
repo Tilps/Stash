@@ -340,4 +340,38 @@ public class BoardTests
         var sol = board.SolveWithRating();
         Assert.True(sol.IsSuccess);
     }
+
+    [Fact]
+    public void Test_Gathered113()
+    {
+        string dir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "GatheredSudokus"));
+        if (!Directory.Exists(dir)) dir = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "GatheredSudokus"));
+        string pPath = Path.Combine(dir, "1.1.3.txt");
+        var lines = File.ReadLines(pPath).Take(11);
+        var board = Board.Parse(string.Join("\n", lines));
+        board.MaxLookahead = 1;
+        var sol = board.SolveWithRating();
+        Assert.Equal(SolveState.Solved, sol.State);
+        Assert.True(sol.IsSuccess);
+        Assert.Equal(1, sol.MaxLookaheadUsed);
+        Assert.Equal(1, sol.Score);
+        Assert.Equal(3, sol.HighTuples);
+    }
+
+    [Fact]
+    public void Test_Gathered113_Puzzle2()
+    {
+        string dir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "GatheredSudokus"));
+        if (!Directory.Exists(dir)) dir = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "GatheredSudokus"));
+        string pPath = Path.Combine(dir, "1.1.3.txt");
+        var lines = File.ReadLines(pPath).Skip(12).Take(11);
+        var board = Board.Parse(string.Join("\n", lines));
+        board.MaxLookahead = 1;
+        var sol = board.SolveWithRating();
+        Assert.Equal(SolveState.Solved, sol.State);
+        Assert.True(sol.IsSuccess);
+        Assert.Equal(1, sol.MaxLookaheadUsed);
+        Assert.Equal(1, sol.Score);
+        Assert.Equal(3, sol.HighTuples);
+    }
 }

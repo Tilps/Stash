@@ -357,8 +357,11 @@ public class Board
     /// <summary>
     /// Performs a lookahead logic branch test with delta-debugging minimization of deductions.
     /// </summary>
-    private SolveState PassPartLookaheadLogic(List<int> branchRows, List<int> branchCols, List<int> values, int lookahead, List<DeductionStep>? structuredSteps = null)
+    private SolveState PassPartLookaheadLogic(List<int> branchRows, List<int> branchCols, List<int> values, int lookahead, List<DeductionStep>? structuredSteps = null, bool isSubsetTrial = false)
     {
+        int maxPasses = isSubsetTrial ? (scoring - 2) : (scoring - 1);
+        if (scoring > 0 && maxPasses < 0) return SolveState.MultipleSolutions;
+
         Board[] boards = new Board[branchRows.Count];
         SolveState[] results = new SolveState[branchRows.Count];
         SolveState result = SolveState.MultipleSolutions;
@@ -376,7 +379,7 @@ public class Board
             }
             else
             {
-                for (int j = 0; j < scoring - 1; j++)
+                for (int j = 0; j < maxPasses; j++)
                 {
                     results[i] = boards[i].PassZeroSlow();
                     if (results[i] != SolveState.Progressing)
@@ -443,13 +446,14 @@ public class Board
                                         {
                                             log.AppendFormat("({0},{1} {2}) ", branchRows[a], branchCols[a], values[a] + 1);
                                         }
+                                        int chainLength = isSubsetTrial ? (scoring - 2) : (scoring - 1);
                                         if (lookahead <= 1)
-                                            log.AppendFormat("Eliminated {0},{1} {2} in {3} steps\n", i, j, k + 1, scoring - 1);
+                                            log.AppendFormat("Eliminated {0},{1} {2} in {3} steps\n", i, j, k + 1, chainLength);
                                         else
                                             log.AppendFormat("Eliminated {0},{1} {2} at {3} branches\n", i, j, k + 1, lookahead);
 
                                         // Step Minimization (Delta-Debugging)
-                                        if (scoring > 1)
+                                        if (chainLength > 0)
                                         {
                                             for (int a = 0; a < branchRows.Count; a++)
                                             {
@@ -458,7 +462,7 @@ public class Board
                                                 List<int> peggedvs = new() { values[a] + 1 };
                                                 List<int> peggedwhen = new() { 0 };
 
-                                                for (int pegged = 0; pegged < scoring - 1; pegged++)
+                                                for (int pegged = 0; pegged < chainLength; pegged++)
                                                 {
                                                     Board tb = Clone();
                                                     tb.Apply(peggedRows, peggedCols, peggedvs);
@@ -481,7 +485,7 @@ public class Board
                                                         possiblevs.RemoveAt(trial);
                                                         tb.Apply(possibleRows, possibleCols, possiblevs);
 
-                                                        for (int nextp = pegged + 1; nextp < scoring - 1; nextp++)
+                                                        for (int nextp = pegged + 1; nextp < chainLength; nextp++)
                                                         {
                                                             if (tb.PassZeroSlow() != SolveState.Progressing)
                                                                 break;
@@ -519,6 +523,16 @@ public class Board
                                                     proofChain.Add($"   → Forces R{peggedRows[b] + 1}C{peggedCols[b] + 1} = {FormatValue(peggedvs[b])}");
                                                     log.AppendFormat(" {3}: {0}, {1} {2}\n", peggedRows[b], peggedCols[b], peggedvs[b], peggedwhen[b]);
                                                 }
+                                                proofChain.Add($"   → Eliminates candidate {FormatValue(k + 1)} from R{i + 1}C{j + 1}");
+                                            }
+                                            proofChain.Add($"Conclusion: All {branchRows.Count} hypotheses eliminate candidate {FormatValue(k + 1)} from R{i + 1}C{j + 1}.");
+                                        }
+                                        else
+                                        {
+                                            for (int a = 0; a < branchRows.Count; a++)
+                                            {
+                                                log.AppendFormat("Trial ({0},{1} {2}):\n", branchRows[a], branchCols[a], values[a] + 1);
+                                                proofChain.Add($"Hypothesis {a + 1}: If R{branchRows[a] + 1}C{branchCols[a] + 1} = {FormatValue(values[a] + 1)}:");
                                                 proofChain.Add($"   → Eliminates candidate {FormatValue(k + 1)} from R{i + 1}C{j + 1}");
                                             }
                                             proofChain.Add($"Conclusion: All {branchRows.Count} hypotheses eliminate candidate {FormatValue(k + 1)} from R{i + 1}C{j + 1}.");
@@ -676,6 +690,19 @@ public class Board
                 }
             }
         }
+
+        // Evaluate subset-derived trials (Naked Subsets and Hidden Subsets of size 'depth' in units)
+        if (scoring == 0 || scoring >= 2)
+        {
+            SolveState subsetState = PassUnitSubsetsLookaheadLogic(depth, lookahead, structuredSteps);
+            if (subsetState == SolveState.Unsolvable || subsetState == SolveState.DefiniteMultipleSolutions) return subsetState;
+            if (subsetState == SolveState.Progressing)
+            {
+                result = SolveState.Progressing;
+                if (scoring > 0) return result;
+            }
+        }
+
         return result;
     }
 
@@ -786,7 +813,239 @@ public class Board
                 }
             }
         }
+
+        for (int d = 2; d <= Math.Max(sizex, sizey); d++)
+        {
+            SolveState subsetState = PassUnitSubsetsLookaheadLogic(d, lookahead, structuredSteps);
+            if (subsetState == SolveState.Unsolvable || subsetState == SolveState.DefiniteMultipleSolutions) return subsetState;
+            if (subsetState == SolveState.Progressing)
+            {
+                result = SolveState.Progressing;
+                if (scoring > 0) return result;
+            }
+        }
+
         return result;
+    }
+
+    private List<(int R, int C)> GetUnitCells(int unitType, int unitIdx)
+    {
+        var list = new List<(int R, int C)>(width);
+        if (unitType == 0) // Row
+        {
+            for (int c = 0; c < width; c++) list.Add((unitIdx, c));
+        }
+        else if (unitType == 1) // Column
+        {
+            for (int r = 0; r < width; r++) list.Add((r, unitIdx));
+        }
+        else // Box
+        {
+            int cx = (unitIdx / sizey) * sizey;
+            int cy = (unitIdx % sizey) * sizex;
+            for (int k = 0; k < width; k++)
+            {
+                int tx = cx + (k / sizex);
+                int ty = cy + (k % sizex);
+                list.Add((tx, ty));
+            }
+        }
+        return list;
+    }
+
+    private static IEnumerable<List<T>> GetCombinations<T>(IReadOnlyList<T> list, int length)
+    {
+        if (length == 0)
+        {
+            yield return new List<T>();
+            yield break;
+        }
+        if (list.Count < length) yield break;
+
+        for (int i = 0; i <= list.Count - length; i++)
+        {
+            var head = list[i];
+            var rest = new List<T>(list.Count - i - 1);
+            for (int j = i + 1; j < list.Count; j++) rest.Add(list[j]);
+
+            foreach (var tail in GetCombinations(rest, length - 1))
+            {
+                tail.Insert(0, head);
+                yield return tail;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Evaluates subset-derived trials (Naked Subsets and Hidden Subsets of size 'depth' in rows, columns, and boxes).
+    /// As per rating rules, identifying a subset counts as 1 cost unit: at score x (scoring == x + 1), the inner forcing
+    /// chain can have depth at most x - 1 (i.e. scoring - 2 passes of PassZeroSlow).
+    /// </summary>
+    private SolveState PassUnitSubsetsLookaheadLogic(int depth, int lookahead, List<DeductionStep>? structuredSteps = null)
+    {
+        if (scoring == 1) return SolveState.MultipleSolutions;
+        if (depth < 2 || depth > width) return SolveState.MultipleSolutions;
+
+        for (int unitType = 0; unitType < 3; unitType++)
+        {
+            for (int unitIdx = 0; unitIdx < width; unitIdx++)
+            {
+                var unitCells = GetUnitCells(unitType, unitIdx);
+                var emptyCells = new List<(int R, int C)>();
+                for (int u = 0; u < unitCells.Count; u++)
+                {
+                    if (cells[unitCells[u].R, unitCells[u].C] == 0)
+                        emptyCells.Add(unitCells[u]);
+                }
+
+                if (emptyCells.Count < depth) continue;
+
+                // 1. Naked Subsets of size 'depth'
+                foreach (var combo in GetCombinations(emptyCells, depth))
+                {
+                    int unionMask = 0;
+                    bool valid = true;
+                    for (int c = 0; c < combo.Count; c++)
+                    {
+                        int cellMask = 0;
+                        for (int v = 0; v < width; v++)
+                        {
+                            if (possibles[combo[c].R, combo[c].C, v]) cellMask |= (1 << v);
+                        }
+                        if (System.Numerics.BitOperations.PopCount((uint)cellMask) < 2)
+                        {
+                            valid = false;
+                            break;
+                        }
+                        unionMask |= cellMask;
+                        if (System.Numerics.BitOperations.PopCount((uint)unionMask) > depth)
+                        {
+                            valid = false;
+                            break;
+                        }
+                    }
+
+                    if (valid && System.Numerics.BitOperations.PopCount((uint)unionMask) == depth)
+                    {
+                        for (int v = 0; v < width; v++)
+                        {
+                            if ((unionMask & (1 << v)) != 0)
+                            {
+                                bool appearsOutside = false;
+                                for (int e = 0; e < emptyCells.Count; e++)
+                                {
+                                    if (!combo.Contains(emptyCells[e]) && possibles[emptyCells[e].R, emptyCells[e].C, v])
+                                    {
+                                        appearsOutside = true;
+                                        break;
+                                    }
+                                }
+
+                                if (appearsOutside)
+                                {
+                                    List<int> branchRows = new();
+                                    List<int> branchCols = new();
+                                    List<int> branchVals = new();
+                                    for (int c = 0; c < combo.Count; c++)
+                                    {
+                                        if (possibles[combo[c].R, combo[c].C, v])
+                                        {
+                                            branchRows.Add(combo[c].R);
+                                            branchCols.Add(combo[c].C);
+                                            branchVals.Add(v);
+                                        }
+                                    }
+
+                                    if (branchRows.Count >= 2)
+                                    {
+                                        var temp = PassPartLookaheadLogic(branchRows, branchCols, branchVals, lookahead, structuredSteps, isSubsetTrial: true);
+                                        if (temp == SolveState.Unsolvable || temp == SolveState.DefiniteMultipleSolutions) return temp;
+                                        if (temp == SolveState.Progressing)
+                                        {
+                                            if (scoring > 0) return temp;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 2. Hidden Subsets of size 'depth'
+                var eligibleValues = new List<int>();
+                var valCells = new List<(int R, int C)>[width];
+                for (int v = 0; v < width; v++)
+                {
+                    valCells[v] = new List<(int R, int C)>();
+                    for (int e = 0; e < emptyCells.Count; e++)
+                    {
+                        if (possibles[emptyCells[e].R, emptyCells[e].C, v])
+                            valCells[v].Add(emptyCells[e]);
+                    }
+                    if (valCells[v].Count >= 2 && valCells[v].Count <= depth)
+                    {
+                        eligibleValues.Add(v);
+                    }
+                }
+
+                if (eligibleValues.Count >= depth)
+                {
+                    foreach (var valCombo in GetCombinations(eligibleValues, depth))
+                    {
+                        var cellsUnion = new HashSet<(int R, int C)>();
+                        for (int i = 0; i < valCombo.Count; i++)
+                        {
+                            cellsUnion.UnionWith(valCells[valCombo[i]]);
+                        }
+
+                        if (cellsUnion.Count == depth)
+                        {
+                            foreach (var cell in cellsUnion)
+                            {
+                                bool hasOtherCands = false;
+                                for (int v = 0; v < width; v++)
+                                {
+                                    if (!valCombo.Contains(v) && possibles[cell.R, cell.C, v])
+                                    {
+                                        hasOtherCands = true;
+                                        break;
+                                    }
+                                }
+
+                                if (hasOtherCands)
+                                {
+                                    List<int> branchRows = new();
+                                    List<int> branchCols = new();
+                                    List<int> branchVals = new();
+                                    for (int i = 0; i < valCombo.Count; i++)
+                                    {
+                                        int v = valCombo[i];
+                                        if (possibles[cell.R, cell.C, v])
+                                        {
+                                            branchRows.Add(cell.R);
+                                            branchCols.Add(cell.C);
+                                            branchVals.Add(v);
+                                        }
+                                    }
+
+                                    if (branchVals.Count >= 2)
+                                    {
+                                        var temp = PassPartLookaheadLogic(branchRows, branchCols, branchVals, lookahead, structuredSteps, isSubsetTrial: true);
+                                        if (temp == SolveState.Unsolvable || temp == SolveState.DefiniteMultipleSolutions) return temp;
+                                        if (temp == SolveState.Progressing)
+                                        {
+                                            if (scoring > 0) return temp;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return SolveState.MultipleSolutions;
     }
 
     /// <summary>
