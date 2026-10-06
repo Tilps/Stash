@@ -30,14 +30,12 @@ public static class PatternClassifier
         int sizex = board.SizeX;
         int sizey = board.SizeY;
 
-        // 1. Check Pointing Pair / Triple (Locked Candidates Type 1)
-        var pointing = CheckPointing(board, targetRow, targetCol, targetVal, branchRows, branchCols, branchVals)
-                     ?? CheckPointingFromBoard(board, targetRow, targetCol, targetVal);
+        // 1. Check Pointing Pair / Triple (Locked Candidates Type 1) directly from trial branches
+        var pointing = CheckPointing(board, targetRow, targetCol, targetVal, branchRows, branchCols, branchVals);
         if (pointing != null) return pointing;
 
-        // 2. Check Box-Line Reduction (Claiming Pair / Triple, Locked Candidates Type 2)
-        var boxLine = CheckBoxLineReduction(board, targetRow, targetCol, targetVal, branchRows, branchCols, branchVals)
-                    ?? CheckBoxLineReductionFromBoard(board, targetRow, targetCol, targetVal);
+        // 2. Check Box-Line Reduction (Claiming Pair / Triple, Locked Candidates Type 2) directly from trial branches
+        var boxLine = CheckBoxLineReduction(board, targetRow, targetCol, targetVal, branchRows, branchCols, branchVals);
         if (boxLine != null) return boxLine;
 
         // 3. Check Naked Pair / Triple / Quad
@@ -128,49 +126,6 @@ public static class PatternClassifier
         return null;
     }
 
-    private static ClassificationResult? CheckPointingFromBoard(Board board, int targetRow, int targetCol, int targetVal)
-    {
-        int width = board.Width;
-        int sizex = board.SizeX;
-        int sizey = board.SizeY;
-
-        for (int br = 0; br < width; br += sizey)
-        {
-            for (int bc = 0; bc < width; bc += sizex)
-            {
-                var boxCells = GetBoxCells(board, br, bc);
-                var cands = boxCells.Where(c => board.Get(c.R, c.C) == 0 && board.CheckPossible(c.R, c.C, targetVal)).ToList();
-                if (cands.Count >= 2 && cands.Count <= 3)
-                {
-                    int boxNum = (br / sizey) * (width / sizex) + (bc / sizex) + 1;
-                    bool isPair = cands.Count == 2;
-                    string typeName = isPair ? "Pointing Pair" : "Pointing Triple";
-                    var type = isPair ? DeductionType.PointingPair : DeductionType.PointingTriple;
-
-                    // Pointing along Row
-                    if (cands.All(c => c.R == targetRow) && (targetRow < br || targetRow >= br + sizey || targetCol < bc || targetCol >= bc + sizex))
-                    {
-                        var involved = cands.Concat(new[] { (targetRow, targetCol) }).ToList();
-                        var arrows = cands.Select(c => new DeductionArrow(c.R, c.C, targetRow, targetCol, $"locks {Board.FormatValue(targetVal)}", "#38bdf8")).ToList();
-                        string cellsDesc = string.Join(" and ", cands.Select(c => $"R{c.R + 1}C{c.C + 1}"));
-                        string explanation = $"{typeName}: In Box {boxNum}, candidate {Board.FormatValue(targetVal)} is confined to Row {targetRow + 1} ({cellsDesc}), eliminating candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}.";
-                        return new ClassificationResult(type, typeName, explanation, $"Box {boxNum} Pointing to Row {targetRow + 1}", involved, arrows, null);
-                    }
-
-                    // Pointing along Col
-                    if (cands.All(c => c.C == targetCol) && (targetRow < br || targetRow >= br + sizey || targetCol < bc || targetCol >= bc + sizex))
-                    {
-                        var involved = cands.Concat(new[] { (targetRow, targetCol) }).ToList();
-                        var arrows = cands.Select(c => new DeductionArrow(c.R, c.C, targetRow, targetCol, $"locks {Board.FormatValue(targetVal)}", "#38bdf8")).ToList();
-                        string cellsDesc = string.Join(" and ", cands.Select(c => $"R{c.R + 1}C{c.C + 1}"));
-                        string explanation = $"{typeName}: In Box {boxNum}, candidate {Board.FormatValue(targetVal)} is confined to Column {targetCol + 1} ({cellsDesc}), eliminating candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}.";
-                        return new ClassificationResult(type, typeName, explanation, $"Box {boxNum} Pointing to Column {targetCol + 1}", involved, arrows, null);
-                    }
-                }
-            }
-        }
-        return null;
-    }
 
     private static ClassificationResult? CheckBoxLineReduction(
         Board board, int targetRow, int targetCol, int targetVal,
@@ -233,59 +188,6 @@ public static class PatternClassifier
         return null;
     }
 
-    private static ClassificationResult? CheckBoxLineReductionFromBoard(Board board, int targetRow, int targetCol, int targetVal)
-    {
-        int width = board.Width;
-        int sizex = board.SizeX;
-        int sizey = board.SizeY;
-        int targetBoxR = (targetRow / sizey) * sizey;
-        int targetBoxC = (targetCol / sizex) * sizex;
-        int boxNum = (targetBoxR / sizey) * (width / sizex) + (targetBoxC / sizex) + 1;
-
-        // Row claims Box
-        for (int r = 0; r < width; r++)
-        {
-            if (r == targetRow) continue;
-            if (r < targetBoxR || r >= targetBoxR + sizey) continue;
-
-            var rowCands = Enumerable.Range(0, width)
-                .Where(c => board.Get(r, c) == 0 && board.CheckPossible(r, c, targetVal))
-                .Select(c => (R: r, C: c))
-                .ToList();
-
-            if (rowCands.Count >= 2 && rowCands.Count <= 3 && rowCands.All(c => c.C >= targetBoxC && c.C < targetBoxC + sizex))
-            {
-                var involved = rowCands.Concat(new[] { (targetRow, targetCol) }).ToList();
-                var arrows = rowCands.Select(c => new DeductionArrow(c.R, c.C, targetRow, targetCol, $"claims {Board.FormatValue(targetVal)}", "#a855f7")).ToList();
-                string cellsDesc = string.Join(" and ", rowCands.Select(c => $"R{c.R + 1}C{c.C + 1}"));
-                string explanation = $"Box-Line Reduction: In Row {r + 1}, candidate {Board.FormatValue(targetVal)} only appears within Box {boxNum} ({cellsDesc}), eliminating candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}.";
-                return new ClassificationResult(DeductionType.BoxLineReduction, "Box-Line Reduction", explanation, $"Row {r + 1} Claims Box {boxNum}", involved, arrows, null);
-            }
-        }
-
-        // Col claims Box
-        for (int c = 0; c < width; c++)
-        {
-            if (c == targetCol) continue;
-            if (c < targetBoxC || c >= targetBoxC + sizex) continue;
-
-            var colCands = Enumerable.Range(0, width)
-                .Where(r => board.Get(r, c) == 0 && board.CheckPossible(r, c, targetVal))
-                .Select(r => (R: r, C: c))
-                .ToList();
-
-            if (colCands.Count >= 2 && colCands.Count <= 3 && colCands.All(c => c.R >= targetBoxR && c.R < targetBoxR + sizey))
-            {
-                var involved = colCands.Concat(new[] { (targetRow, targetCol) }).ToList();
-                var arrows = colCands.Select(c => new DeductionArrow(c.R, c.C, targetRow, targetCol, $"claims {Board.FormatValue(targetVal)}", "#a855f7")).ToList();
-                string cellsDesc = string.Join(" and ", colCands.Select(c => $"R{c.R + 1}C{c.C + 1}"));
-                string explanation = $"Box-Line Reduction: In Column {c + 1}, candidate {Board.FormatValue(targetVal)} only appears within Box {boxNum} ({cellsDesc}), eliminating candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}.";
-                return new ClassificationResult(DeductionType.BoxLineReduction, "Box-Line Reduction", explanation, $"Column {c + 1} Claims Box {boxNum}", involved, arrows, null);
-            }
-        }
-
-        return null;
-    }
 
     private static ClassificationResult? CheckNakedSubset(Board board, int targetRow, int targetCol, int targetVal)
     {
