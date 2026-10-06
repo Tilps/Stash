@@ -331,13 +331,25 @@ public class Board
 
     public SolveState SolveProper()
     {
+        lastLookaheadUsed = 0;
         SolveState result = SolveState.Progressing;
         while (result == SolveState.Progressing)
         {
             result = PassZeroSlow();
             if (result == SolveState.MultipleSolutions && Full)
                 result = SolveState.Solved;
+
+            int counter = 0;
+            while (result == SolveState.MultipleSolutions && counter < maxLookahead)
+            {
+                result = PassLookaheadLogic(counter + 1);
+                if (lastLookaheadUsed < counter + 1)
+                    lastLookaheadUsed = counter + 1;
+                counter++;
+            }
         }
+        if (result == SolveState.DefiniteMultipleSolutions)
+            result = SolveState.MultipleSolutions;
         return result;
     }
 
@@ -652,6 +664,116 @@ public class Board
                         }
                     }
                     if (branchRows.Count == depth)
+                    {
+                        SolveState temp = PassPartLookaheadLogic(branchRows, branchCols, values, lookahead, structuredSteps);
+                        if (temp == SolveState.Unsolvable || temp == SolveState.DefiniteMultipleSolutions) return temp;
+                        if (temp == SolveState.Progressing)
+                        {
+                            result = SolveState.Progressing;
+                            if (scoring > 0) return result;
+                        }
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    private SolveState PassLookaheadLogic(int lookahead, List<DeductionStep>? structuredSteps = null)
+    {
+        List<int> branchRows = new();
+        List<int> branchCols = new();
+        List<int> values = new();
+        SolveState result = SolveState.MultipleSolutions;
+
+        for (int i = 0; i < width; i++)
+        {
+            for (int j = 0; j < width; j++)
+            {
+                // Check across row j for candidate value i
+                branchRows.Clear(); branchCols.Clear(); values.Clear();
+                for (int k = 0; k < width; k++)
+                {
+                    if (possibles[j, k, i])
+                    {
+                        branchRows.Add(j);
+                        branchCols.Add(k);
+                        values.Add(i);
+                    }
+                }
+                if (branchRows.Count > 1)
+                {
+                    SolveState temp = PassPartLookaheadLogic(branchRows, branchCols, values, lookahead, structuredSteps);
+                    if (temp == SolveState.Unsolvable || temp == SolveState.DefiniteMultipleSolutions) return temp;
+                    if (temp == SolveState.Progressing)
+                    {
+                        result = SolveState.Progressing;
+                        if (scoring > 0) return result;
+                    }
+                }
+
+                // Check across column j for candidate value i
+                branchRows.Clear(); branchCols.Clear(); values.Clear();
+                for (int k = 0; k < width; k++)
+                {
+                    if (possibles[k, j, i])
+                    {
+                        branchRows.Add(k);
+                        branchCols.Add(j);
+                        values.Add(i);
+                    }
+                }
+                if (branchRows.Count > 1)
+                {
+                    SolveState temp = PassPartLookaheadLogic(branchRows, branchCols, values, lookahead, structuredSteps);
+                    if (temp == SolveState.Unsolvable || temp == SolveState.DefiniteMultipleSolutions) return temp;
+                    if (temp == SolveState.Progressing)
+                    {
+                        result = SolveState.Progressing;
+                        if (scoring > 0) return result;
+                    }
+                }
+
+                // Check across box j for candidate value i
+                branchRows.Clear(); branchCols.Clear(); values.Clear();
+                int cx = (j / sizey) * sizey;
+                int cy = (j % sizey) * sizex;
+                for (int k = 0; k < width; k++)
+                {
+                    int tx = cx + (k / sizex);
+                    int ty = cy + (k % sizex);
+                    if (possibles[tx, ty, i])
+                    {
+                        branchRows.Add(tx);
+                        branchCols.Add(ty);
+                        values.Add(i);
+                    }
+                }
+                if (branchRows.Count > 1)
+                {
+                    SolveState temp = PassPartLookaheadLogic(branchRows, branchCols, values, lookahead, structuredSteps);
+                    if (temp == SolveState.Unsolvable || temp == SolveState.DefiniteMultipleSolutions) return temp;
+                    if (temp == SolveState.Progressing)
+                    {
+                        result = SolveState.Progressing;
+                        if (scoring > 0) return result;
+                    }
+                }
+
+                // Cell candidates check
+                if (cells[i, j] == 0)
+                {
+                    branchRows.Clear(); branchCols.Clear(); values.Clear();
+                    for (int k = 0; k < width; k++)
+                    {
+                        if (possibles[i, j, k])
+                        {
+                            branchRows.Add(i);
+                            branchCols.Add(j);
+                            values.Add(k);
+                        }
+                    }
+                    if (branchRows.Count > 1)
                     {
                         SolveState temp = PassPartLookaheadLogic(branchRows, branchCols, values, lookahead, structuredSteps);
                         if (temp == SolveState.Unsolvable || temp == SolveState.DefiniteMultipleSolutions) return temp;

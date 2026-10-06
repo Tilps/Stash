@@ -40,6 +40,13 @@ public sealed record PresetPuzzle(string Title, string Difficulty, string Clues,
         new(
             "Classic Medium",
             "Medium",
+            ".759.4......1....418...5.....9.83...8.......2...56.7.....3...756....7......8.263.",
+            SizeX: 3,
+            SizeY: 3
+        ),
+        new(
+            "Classic Hard",
+            "Hard",
             "2.6........7.1..92.8...5.....576.9..9...4...6..1.394.....1...8.63..5.2........5.4",
             SizeX: 3,
             SizeY: 3

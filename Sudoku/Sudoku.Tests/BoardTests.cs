@@ -295,4 +295,49 @@ public class BoardTests
             Assert.False(string.IsNullOrWhiteSpace(step.Explanation));
         }
     }
+
+    [Fact]
+    public void Test_ClassicMedium()
+    {
+        var preset = PresetPuzzle.Presets.First(p => p.Title == "Classic Medium");
+        var board = Board.Parse(preset.Clues, preset.SizeX, preset.SizeY);
+        board.MaxLookahead = 1;
+        var sol = board.SolveWithRating();
+
+        Assert.Equal(SolveState.Solved, sol.State);
+        Assert.True(sol.IsSuccess);
+        Assert.Equal(1, sol.MaxLookaheadUsed);
+    }
+
+    [Fact]
+    public void Test_ClassicHard()
+    {
+        var preset = PresetPuzzle.Presets.First(p => p.Title == "Classic Hard");
+        var board = Board.Parse(preset.Clues, preset.SizeX, preset.SizeY);
+        var dlxSol = board.Clone().SolveFast();
+
+        board.MaxLookahead = 2;
+        var sol = board.SolveWithRating();
+
+        Assert.Equal(SolveState.Solved, sol.State);
+        Assert.True(sol.IsSuccess);
+        Assert.Equal(2, sol.MaxLookaheadUsed);
+        for (int r = 0; r < 9; r++)
+        {
+            for (int c = 0; c < 9; c++)
+            {
+                Assert.Equal(dlxSol.SolvedGrid[r, c], sol.SolvedGrid[r, c]);
+            }
+        }
+    }
+
+    [Fact]
+    public void Test_ChallengingPreset()
+    {
+        var preset = PresetPuzzle.Presets.First(p => p.Title == "Challenging");
+        var board = Board.Parse(preset.Clues, preset.SizeX, preset.SizeY);
+        board.MaxLookahead = 2;
+        var sol = board.SolveWithRating();
+        Assert.True(sol.IsSuccess);
+    }
 }
