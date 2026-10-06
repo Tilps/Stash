@@ -121,6 +121,7 @@ public class Board
 
     private int scoring;
     private int highTuples;
+    private bool anyBranchTruncated;
     public int HighTuples => highTuples;
 
     public string DifficultyRating => (lastLookaheadUsed != 1)
@@ -393,6 +394,10 @@ public class Board
                     if (results[i] != SolveState.Progressing)
                         break;
                 }
+                if (results[i] == SolveState.Progressing)
+                {
+                    anyBranchTruncated = true;
+                }
             }
         }
 
@@ -602,7 +607,7 @@ public class Board
         return result;
     }
 
-    private SolveState PassLookaheadLogic(int depth, int lookahead, List<DeductionStep>? structuredSteps = null)
+    private async Task<SolveState> PassLookaheadLogicAsync(int depth, int lookahead, List<DeductionStep>? structuredSteps = null, Func<string, ValueTask>? yieldCallback = null)
     {
         List<int> branchRows = new();
         List<int> branchCols = new();
@@ -611,6 +616,7 @@ public class Board
 
         for (int i = 0; i < width; i++)
         {
+            if (yieldCallback != null) await yieldCallback($"Lookahead {lookahead}: testing candidate {i + 1}...");
             for (int j = 0; j < width; j++)
             {
                 // Check across row j for candidate value i
@@ -711,8 +717,9 @@ public class Board
         }
 
         // Evaluate subset-derived trials (Naked Subsets and Hidden Subsets of size 'depth' in units)
-        if (scoring == 0 || scoring >= 2)
+        if (scoring >= 2)
         {
+            if (yieldCallback != null) await yieldCallback($"Lookahead {lookahead}: testing subsets of size {depth}...");
             SolveState subsetState = PassUnitSubsetsLookaheadLogic(depth, lookahead, structuredSteps);
             if (subsetState == SolveState.Unsolvable || subsetState == SolveState.DefiniteMultipleSolutions) return subsetState;
             if (subsetState == SolveState.Progressing)
@@ -832,18 +839,6 @@ public class Board
                 }
             }
         }
-
-        for (int d = 2; d <= Math.Max(sizex, sizey); d++)
-        {
-            SolveState subsetState = PassUnitSubsetsLookaheadLogic(d, lookahead, structuredSteps);
-            if (subsetState == SolveState.Unsolvable || subsetState == SolveState.DefiniteMultipleSolutions) return subsetState;
-            if (subsetState == SolveState.Progressing)
-            {
-                result = SolveState.Progressing;
-                if (scoring > 0) return result;
-            }
-        }
-
         return result;
     }
 
@@ -902,7 +897,7 @@ public class Board
     /// </summary>
     private SolveState PassUnitSubsetsLookaheadLogic(int depth, int lookahead, List<DeductionStep>? structuredSteps = null)
     {
-        if (scoring == 1) return SolveState.MultipleSolutions;
+        if (scoring < 2) return SolveState.MultipleSolutions;
         if (depth < 2 || depth > width) return SolveState.MultipleSolutions;
 
         for (int unitType = 0; unitType < 3; unitType++)
@@ -1071,9 +1066,13 @@ public class Board
     /// Solves the puzzle using logical deductions, records minimized explanation steps, and rates difficulty.
     /// Supports cooperative yielding and cancellation.
     /// </summary>
-    public async Task<SudokuSolution> SolveWithRatingAsync(IProgress<SolverProgress>? progress = null, CancellationToken cancellationToken = default)
+    public async Task<SudokuSolution> SolveWithRatingAsync(
+        IProgress<SolverProgress>? progress = null, 
+        CancellationToken cancellationToken = default,
+        bool enableYield = true)
     {
         var sw = Stopwatch.StartNew();
+        var yieldSw = Stopwatch.StartNew();
         int[,] initial = (int[,])cells.Clone();
         var structuredSteps = new List<DeductionStep>();
 
@@ -1082,16 +1081,32 @@ public class Board
         maxScore = 1;
         highTuples = 0;
 
+        Func<string, ValueTask>? yieldCallback = null;
+        if (enableYield)
+        {
+            yieldCallback = async (actionDesc) =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (yieldSw.ElapsedMilliseconds >= 30)
+                {
+                    progress?.Report(new SolverProgress(structuredSteps.Count, lastLookaheadUsed, Score, actionDesc));
+                    await Task.Yield();
+                    yieldSw.Restart();
+                }
+            };
+        }
+
         SolveState result = SolveState.Progressing;
-        int passCount = 0;
 
         while (result == SolveState.Progressing)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if ((++passCount % 5) == 0)
+            if (yieldCallback != null)
             {
-                progress?.Report(new SolverProgress(structuredSteps.Count, lastLookaheadUsed, Score, "Evaluating deductions..."));
-                await Task.Yield();
+                await yieldCallback("Evaluating basic deductions...");
+            }
+            else
+            {
+                cancellationToken.ThrowIfCancellationRequested();
             }
 
             result = PassZeroSlow(structuredSteps);
@@ -1103,18 +1118,27 @@ public class Board
             int counter = 0;
             while (result == SolveState.MultipleSolutions && counter < maxLookahead)
             {
-                cancellationToken.ThrowIfCancellationRequested();
                 scoring = 1;
                 int max = counter > 0 ? 2 : width * width + 1;
 
                 while (result == SolveState.MultipleSolutions && scoring < max)
                 {
+                    anyBranchTruncated = false;
                     int tuples = 2;
                     int maxTuples = scoring < 2 ? Math.Max(sizex, sizey) : width;
 
                     while (result == SolveState.MultipleSolutions && tuples <= maxTuples)
                     {
-                        result = PassLookaheadLogic(tuples, counter + 1, structuredSteps);
+                        if (yieldCallback != null)
+                        {
+                            await yieldCallback($"Testing Lookahead {counter + 1} (Score {scoring - 1}, Tuples {tuples})...");
+                        }
+                        else
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                        }
+
+                        result = await PassLookaheadLogicAsync(tuples, counter + 1, structuredSteps, yieldCallback);
                         if (result != SolveState.MultipleSolutions)
                         {
                             if (scoring > maxScore)
@@ -1134,6 +1158,13 @@ public class Board
                         }
                         tuples++;
                     }
+                    if (counter == 0 && scoring >= 3 && !anyBranchTruncated)
+                    {
+                        // No branch was truncated by maxPasses at this scoring level,
+                        // meaning all branches naturally ran out of singles before maxPasses.
+                        // Increasing scoring cannot find any new deductions in lookahead 1.
+                        break;
+                    }
                     scoring++;
                 }
                 counter++;
@@ -1146,6 +1177,7 @@ public class Board
         }
 
         sw.Stop();
+        progress?.Report(new SolverProgress(structuredSteps.Count, lastLookaheadUsed, Score, "Analysis complete!"));
 
         return new SudokuSolution(
             State: result,
@@ -1162,7 +1194,7 @@ public class Board
 
     public SudokuSolution SolveWithRating(CancellationToken cancellationToken = default)
     {
-        return SolveWithRatingAsync(null, cancellationToken).GetAwaiter().GetResult();
+        return SolveWithRatingAsync(null, cancellationToken, enableYield: false).GetAwaiter().GetResult();
     }
 
     /// <summary>

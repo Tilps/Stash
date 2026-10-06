@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Sudoku.Core.Generator;
 using Sudoku.Core.Models;
 using Sudoku.Core.Solver;
@@ -317,7 +318,14 @@ public class BoardTests
         var dlxSol = board.Clone().SolveFast();
 
         board.MaxLookahead = 2;
+        var sw = Stopwatch.StartNew();
         var sol = board.SolveWithRating();
+        sw.Stop();
+        Console.WriteLine($"[TEST_PROFILE] Classic Hard solved in {sw.ElapsedMilliseconds} ms, {sol.Steps.Count} steps, Lookahead: {sol.MaxLookaheadUsed}, Score: {sol.Score}, HighTuples: {sol.HighTuples}");
+        foreach (var s in sol.Steps.Where(s => s.Type != DeductionType.NakedSingle && s.Type != DeductionType.HiddenSingleRow && s.Type != DeductionType.HiddenSingleColumn && s.Type != DeductionType.HiddenSingleBox))
+        {
+            Console.WriteLine($"   Step #{s.StepNumber}: {s.Type} at R{s.Row+1}C{s.Col+1} val={s.Value} - {s.Explanation}");
+        }
 
         Assert.Equal(SolveState.Solved, sol.State);
         Assert.True(sol.IsSuccess);
@@ -442,4 +450,36 @@ public class BoardTests
         // It must NOT misclassify as XY-Wing! It must report Forcing Chain.
         Assert.Equal(DeductionType.ForcingChain, result.Type);
     }
+
+    [Fact]
+    public async Task Test_SolveWithRatingAsync_ReportsProgressAndCooperativelyYields()
+    {
+        var preset = PresetPuzzle.Presets.First(p => p.Title == "Classic Hard");
+        var board = Board.Parse(preset.Clues, preset.SizeX, preset.SizeY);
+        board.MaxLookahead = 2;
+
+        var progressUpdates = new List<SolverProgress>();
+        var progress = new Progress<SolverProgress>(p => progressUpdates.Add(p));
+
+        using var cts = new CancellationTokenSource();
+        var solution = await board.SolveWithRatingAsync(progress, cts.Token, enableYield: true);
+
+        Assert.Equal(SolveState.Solved, solution.State);
+        Assert.True(progressUpdates.Count > 0, "Expected cooperative progress reports during solve.");
+    }
+
+    [Fact]
+    public async Task Test_SolveWithRatingAsync_CancelsPromptly()
+    {
+        var preset = PresetPuzzle.Presets.First(p => p.Title == "Classic Hard");
+        var board = Board.Parse(preset.Clues, preset.SizeX, preset.SizeY);
+        board.MaxLookahead = 2;
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+        {
+            await board.SolveWithRatingAsync(cancellationToken: cts.Token, enableYield: true);
+        });
+    }
 }
+
