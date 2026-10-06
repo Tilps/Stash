@@ -522,4 +522,31 @@ body {
     color: var(--color-cyan);
     inset: calc(35vh + 2.25rem) 0 auto 0;
 }
+
+#blazor-error-ui {
+    background: #1e1b4b;
+    color: #fca5a5;
+    bottom: 0;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.6);
+    box-sizing: border-box;
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 2000;
+}
+
+#blazor-error-ui .reload {
+    color: var(--color-cyan);
+    margin-left: 0.5rem;
+    text-decoration: underline;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
+    color: var(--text-secondary);
 }
