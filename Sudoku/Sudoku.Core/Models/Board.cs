@@ -729,6 +729,20 @@ public class Board
             }
         }
 
+        // Evaluate 2-dimensional subsets (Fish: X-Wing, Swordfish, Jellyfish across pairs of Row, Col, Box)
+        // Scaled cost: size 'depth' requires scoring >= 1 + depth (e.g. depth 2 -> score 1.2, depth 3 -> score 1.3)
+        if (scoring >= 1 + depth && depth <= width / 2)
+        {
+            if (yieldCallback != null) await yieldCallback($"Lookahead {lookahead}: testing 2D subsets (fish) of size {depth}...");
+            SolveState fishState = Pass2DSubsetsLookaheadLogic(depth, lookahead, structuredSteps);
+            if (fishState == SolveState.Unsolvable || fishState == SolveState.DefiniteMultipleSolutions) return fishState;
+            if (fishState == SolveState.Progressing)
+            {
+                result = SolveState.Progressing;
+                if (scoring > 0) return result;
+            }
+        }
+
         return result;
     }
 
@@ -866,6 +880,20 @@ public class Board
         }
         return list;
     }
+
+    private int GetUnitIndex(int unitType, int r, int c)
+    {
+        if (unitType == 0) return r;
+        if (unitType == 1) return c;
+        return (r / sizey) * sizey + (c / sizex);
+    }
+
+    private static string GetUnitTypeName(int unitType) => unitType switch
+    {
+        0 => "Row",
+        1 => "Column",
+        _ => "Box"
+    };
 
     private static IEnumerable<List<T>> GetCombinations<T>(IReadOnlyList<T> list, int length)
     {
@@ -1063,6 +1091,182 @@ public class Board
     }
 
     /// <summary>
+    /// Evaluates 2-dimensional subsets (Fish: X-Wing, Swordfish, Jellyfish, and Franken Fish across all pairs of Row, Column, Box).
+    /// Uses scaled cost: a 2D subset of size 'depth' has cost 'depth' and requires scoring >= 1 + depth.
+    /// (e.g. depth 2 (X-Wing) -> scoring 3 (Score 1.2), depth 3 (Swordfish) -> scoring 4 (Score 1.3), depth 4 (Jellyfish) -> scoring 5 (Score 1.4)).
+    /// </summary>
+    private SolveState Pass2DSubsetsLookaheadLogic(int depth, int lookahead, List<DeductionStep>? structuredSteps = null)
+    {
+        if (depth < 2 || depth > width / 2) return SolveState.MultipleSolutions;
+        if (scoring < 1 + depth) return SolveState.MultipleSolutions;
+
+        // Iterate over all 6 ordered pairs of distinct unit types:
+        // (Row, Col), (Col, Row), (Row, Box), (Box, Row), (Col, Box), (Box, Col)
+        for (int typeA = 0; typeA < 3; typeA++)
+        {
+            for (int typeB = 0; typeB < 3; typeB++)
+            {
+                if (typeA == typeB) continue;
+
+                for (int v = 0; v < width; v++)
+                {
+                    var eligibleUnits = new List<(int UnitIdx, int CoverMask, List<(int R, int C)> Cells)>();
+
+                    for (int a = 0; a < width; a++)
+                    {
+                        var uCells = GetUnitCells(typeA, a);
+                        var candCells = new List<(int R, int C)>();
+                        int coverMask = 0;
+
+                        for (int i = 0; i < uCells.Count; i++)
+                        {
+                            int r = uCells[i].R;
+                            int c = uCells[i].C;
+                            if (cells[r, c] == 0 && possibles[r, c, v])
+                            {
+                                candCells.Add((r, c));
+                                int bIdx = GetUnitIndex(typeB, r, c);
+                                coverMask |= (1 << bIdx);
+                            }
+                        }
+
+                        int coverCount = System.Numerics.BitOperations.PopCount((uint)coverMask);
+                        if (coverCount >= 2 && coverCount <= depth)
+                        {
+                            eligibleUnits.Add((a, coverMask, candCells));
+                        }
+                    }
+
+                    if (eligibleUnits.Count < depth) continue;
+
+                    foreach (var combo in GetCombinations(eligibleUnits, depth))
+                    {
+                        int unionCoverMask = 0;
+                        for (int i = 0; i < combo.Count; i++)
+                        {
+                            unionCoverMask |= combo[i].CoverMask;
+                        }
+
+                        if (System.Numerics.BitOperations.PopCount((uint)unionCoverMask) == depth)
+                        {
+                            var baseUnitIndices = new HashSet<int>(combo.Select(c => c.UnitIdx));
+                            var eliminations = new List<(int R, int C)>();
+
+                            for (int b = 0; b < width; b++)
+                            {
+                                if ((unionCoverMask & (1 << b)) != 0)
+                                {
+                                    var bCells = GetUnitCells(typeB, b);
+                                    for (int i = 0; i < bCells.Count; i++)
+                                    {
+                                        int r = bCells[i].R;
+                                        int c = bCells[i].C;
+                                        if (cells[r, c] == 0 && possibles[r, c, v])
+                                        {
+                                            int aIdx = GetUnitIndex(typeA, r, c);
+                                            if (!baseUnitIndices.Contains(aIdx))
+                                            {
+                                                eliminations.Add((r, c));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (eliminations.Count > 0)
+                            {
+                                var allBaseCells = new List<(int R, int C)>();
+                                for (int i = 0; i < combo.Count; i++)
+                                {
+                                    allBaseCells.AddRange(combo[i].Cells);
+                                }
+
+                                string typeNameA = GetUnitTypeName(typeA);
+                                string typeNameB = GetUnitTypeName(typeB);
+                                bool isStandardFish = (typeA < 2 && typeB < 2);
+
+                                string fishName = depth switch
+                                {
+                                    2 => isStandardFish ? "X-Wing" : $"Franken X-Wing ({typeNameA}/{typeNameB})",
+                                    3 => isStandardFish ? "Swordfish" : $"Franken Swordfish ({typeNameA}/{typeNameB})",
+                                    4 => isStandardFish ? "Jellyfish" : $"Franken Jellyfish ({typeNameA}/{typeNameB})",
+                                    _ => $"Fish {depth}D ({typeNameA}/{typeNameB})"
+                                };
+
+                                var dType = depth switch
+                                {
+                                    2 => DeductionType.XWing,
+                                    3 => DeductionType.Swordfish,
+                                    4 => DeductionType.Jellyfish,
+                                    _ => DeductionType.XWing
+                                };
+
+                                string baseIndicesStr = string.Join(", ", combo.Select(c => (c.UnitIdx + 1).ToString()));
+                                var coverIndicesList = new List<int>();
+                                for (int b = 0; b < width; b++)
+                                {
+                                    if ((unionCoverMask & (1 << b)) != 0) coverIndicesList.Add(b + 1);
+                                }
+                                string coverIndicesStr = string.Join(", ", coverIndicesList);
+
+                                for (int e = 0; e < eliminations.Count; e++)
+                                {
+                                    int er = eliminations[e].R;
+                                    int ec = eliminations[e].C;
+                                    possibles[er, ec, v] = false;
+
+                                    if (structuredSteps != null)
+                                    {
+                                        var arrows = new List<DeductionArrow>();
+                                        int elimBIdx = GetUnitIndex(typeB, er, ec);
+                                        for (int b = 0; b < allBaseCells.Count; b++)
+                                        {
+                                            if (GetUnitIndex(typeB, allBaseCells[b].R, allBaseCells[b].C) == elimBIdx)
+                                            {
+                                                arrows.Add(new DeductionArrow(allBaseCells[b].R, allBaseCells[b].C, er, ec, $"fish {FormatValue(v + 1)}", "#06b6d4"));
+                                            }
+                                        }
+
+                                        var proof = new List<string>
+                                        {
+                                            $"2D Subset ({fishName}) for candidate {FormatValue(v + 1)}:",
+                                            $"Base: {typeNameA}s {baseIndicesStr} have candidate {FormatValue(v + 1)} confined to {typeNameB}s {coverIndicesStr}.",
+                                            $"By Pigeonhole Principle across {depth} {typeNameA}s, candidate {FormatValue(v + 1)} must occur within these intersection cells.",
+                                            $"Therefore, candidate {FormatValue(v + 1)} is eliminated from R{er + 1}C{ec + 1}."
+                                        };
+
+                                        structuredSteps.Add(new DeductionStep(
+                                            StepNumber: structuredSteps.Count + 1,
+                                            Row: er,
+                                            Col: ec,
+                                            Value: v + 1,
+                                            Type: dType,
+                                            Explanation: $"{fishName}: In {typeNameA}s {baseIndicesStr}, candidate {FormatValue(v + 1)} appears only in {typeNameB}s {coverIndicesStr}, eliminating candidate {FormatValue(v + 1)} from R{er + 1}C{ec + 1}.",
+                                            HighlightCells: allBaseCells.Concat(new[] { (er, ec) }).Distinct().ToList(),
+                                            GroupDescription: $"{fishName} ({typeNameA}s {baseIndicesStr})",
+                                            ProofChain: proof,
+                                            Arrows: arrows
+                                        ));
+                                    }
+
+                                    if (UseLogging)
+                                    {
+                                        log.AppendFormat("{0} on {1} eliminated ({2},{3})\n", fishName, v + 1, er, ec);
+                                    }
+                                }
+
+                                return SolveState.Progressing;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return SolveState.MultipleSolutions;
+    }
+
+    /// <summary>
     /// Solves the puzzle using logical deductions, records minimized explanation steps, and rates difficulty.
     /// Supports cooperative yielding and cancellation.
     /// </summary>
@@ -1158,10 +1362,10 @@ public class Board
                         }
                         tuples++;
                     }
-                    if (counter == 0 && scoring >= 3 && !anyBranchTruncated)
+                    if (counter == 0 && scoring >= 1 + (width / 2) && !anyBranchTruncated)
                     {
                         // No branch was truncated by maxPasses at this scoring level,
-                        // meaning all branches naturally ran out of singles before maxPasses.
+                        // and scoring has reached the threshold to evaluate all 2D fish sizes up to width / 2.
                         // Increasing scoring cannot find any new deductions in lookahead 1.
                         break;
                     }

@@ -524,5 +524,68 @@ public class BoardTests
         var sol = testBoard.SolveWithRating();
         Assert.True(sol.IsSuccess);
     }
+
+    [Fact]
+    public void Test_2DSubsets_XWing_Elimination()
+    {
+        var board = new Board(3, 3);
+        int v = 5; // value 5
+        // Row 1: clear value 5 except Col 1 and Col 4
+        for (int c = 0; c < 9; c++)
+        {
+            if (c != 1 && c != 4) board.SetCandidate(1, c, v, false);
+        }
+        // Row 5: clear value 5 except Col 1 and Col 4
+        for (int c = 0; c < 9; c++)
+        {
+            if (c != 1 && c != 4) board.SetCandidate(5, c, v, false);
+        }
+        // Ensure Row 8 Col 1 has candidate 5
+        Assert.True(board.CheckPossible(8, 1, v));
+
+        // Solve with rating at lookahead 1
+        board.MaxLookahead = 1;
+        var solution = board.SolveWithRating();
+
+        // Candidate 5 should be eliminated from Row 8 Col 1 via X-Wing
+        Assert.False(board.CheckPossible(8, 1, v));
+        var xwingStep = solution.Steps.FirstOrDefault(s => s.Type == DeductionType.XWing && s.Row == 8 && s.Col == 1 && s.Value == v);
+        Assert.NotNull(xwingStep);
+        Assert.Contains("X-Wing", xwingStep.Explanation);
+    }
+
+    [Fact]
+    public void Test_2DSubsets_Swordfish_Elimination()
+    {
+        var board = new Board(3, 3);
+        int v = 7; // value 7
+        // Row 1: only in cols 2, 5, 8 (3 candidates)
+        for (int c = 0; c < 9; c++)
+        {
+            if (c != 2 && c != 5 && c != 8) board.SetCandidate(1, c, v, false);
+        }
+        // Row 4: only in cols 2, 5, 8 (3 candidates)
+        for (int c = 0; c < 9; c++)
+        {
+            if (c != 2 && c != 5 && c != 8) board.SetCandidate(4, c, v, false);
+        }
+        // Row 7: only in cols 2, 5, 8 (3 candidates)
+        for (int c = 0; c < 9; c++)
+        {
+            if (c != 2 && c != 5 && c != 8) board.SetCandidate(7, c, v, false);
+        }
+        // Target cell: Row 3 Col 2 has candidate 7
+        Assert.True(board.CheckPossible(3, 2, v));
+
+        // Solve with rating at lookahead 1
+        board.MaxLookahead = 1;
+        var solution = board.SolveWithRating();
+
+        // Candidate 7 should be eliminated from Row 3 Col 2 via Swordfish
+        Assert.False(board.CheckPossible(3, 2, v));
+        var swordfishStep = solution.Steps.FirstOrDefault(s => s.Type == DeductionType.Swordfish && s.Row == 3 && s.Col == 2 && s.Value == v);
+        Assert.NotNull(swordfishStep);
+        Assert.Contains("Swordfish", swordfishStep.Explanation);
+    }
 }
 
