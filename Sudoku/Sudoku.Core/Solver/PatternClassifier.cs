@@ -163,7 +163,7 @@ public static class PatternClassifier
             var arrows = new List<DeductionArrow>();
             for (int i = 0; i < bRows.Count; i++)
             {
-                arrows.Add(new DeductionArrow(bRows[i], bCols[i], targetRow, targetCol, $"claims {Board.FormatValue(targetVal)}", "#a855f7"));
+                arrows.Add(new DeductionArrow(bRows[i], bCols[i], targetRow, targetCol, $"claims {Board.FormatValue(targetVal)}", "#38bdf8"));
             }
 
             string cellsDesc = string.Join(" and ", bRows.Zip(bCols, (r, c) => $"R{r + 1}C{c + 1}"));
@@ -179,7 +179,7 @@ public static class PatternClassifier
             var arrows = new List<DeductionArrow>();
             for (int i = 0; i < bRows.Count; i++)
             {
-                arrows.Add(new DeductionArrow(bRows[i], bCols[i], targetRow, targetCol, $"claims {Board.FormatValue(targetVal)}", "#a855f7"));
+                arrows.Add(new DeductionArrow(bRows[i], bCols[i], targetRow, targetCol, $"claims {Board.FormatValue(targetVal)}", "#38bdf8"));
             }
 
             string cellsDesc = string.Join(" and ", bRows.Zip(bCols, (r, c) => $"R{r + 1}C{c + 1}"));

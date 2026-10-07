@@ -667,16 +667,11 @@
     border: 1px solid rgba(59, 130, 246, 0.3);
 }
 
-.step-type-tag.badge-pointing {
+.step-type-tag.badge-pointing,
+.step-type-tag.badge-boxline {
     color: #38bdf8;
     background: rgba(56, 189, 248, 0.18);
     border-color: rgba(56, 189, 248, 0.4);
-}
-
-.step-type-tag.badge-boxline {
-    color: #c084fc;
-    background: rgba(192, 132, 252, 0.18);
-    border-color: rgba(192, 132, 252, 0.4);
 }
 
 .step-type-tag.badge-naked-subset {
