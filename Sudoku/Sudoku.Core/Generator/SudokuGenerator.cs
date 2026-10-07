@@ -5,9 +5,11 @@ namespace Sudoku.Core.Generator;
 
 public enum Difficulty
 {
+    Trivial,
     Easy,
     Medium,
     Hard,
+    Challenging,
     Expert
 }
 
@@ -73,6 +75,17 @@ public class SudokuGenerator
 
                     if (criteria.Matches(testBoard.LastLookaheadUsed, testBoard.Score, testBoard.HighTuples))
                     {
+                        if (criteria.NamedStrategiesOnly)
+                        {
+                            bool hasGenericChain = solution.Steps.Any(s =>
+                                s.Type is DeductionType.ForcingChain or DeductionType.LookaheadElimination);
+                            if (hasGenericChain)
+                            {
+                                bestFallback ??= candidate;
+                                continue;
+                            }
+                        }
+
                         return candidate;
                     }
                     else
@@ -103,12 +116,15 @@ public class SudokuGenerator
 
     private int GetTargetClues(DifficultyCriteria criteria)
     {
-        // For 9x9: target 36 clues for easy down to 24 for expert
+        // For 9x9: target 37 clues for trivial down to 23 for expert
         // Scale proportionally for other board sizes
         double ratio = criteria.TargetPattern switch
         {
-            "0" or "Easy" => 0.44,
-            "1.4+ / 2" or "Hard" => 0.32,
+            "0" or "Trivial" => 0.46,
+            "1.0" or "Easy" => 0.42,
+            "1.1" or "Medium" => 0.36,
+            "1.2" or "Hard" => 0.32,
+            "1.3+ / 2" or "Challenging" => 0.30,
             "2" or "Expert" => 0.28,
             _ => 0.36
         };

@@ -102,6 +102,21 @@
     border-color: #64748b;
 }
 
+.checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: #cbd5e1;
+    cursor: pointer;
+    user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+    accent-color: #38bdf8;
+    cursor: pointer;
+}
+
 /* Main Layout Grid */
 .sudoku-workspace {
     display: grid;
@@ -546,6 +561,7 @@
 .badge-easy { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; }
 .badge-medium { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #f59e0b; }
 .badge-hard { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
+.badge-expert { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid #a855f7; }
 
 /* Explanation Walkthrough Card */
 .explainer-card {

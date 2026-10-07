@@ -45,10 +45,12 @@
         <div class="toolbar-group">
             <span class="toolbar-label">Difficulty:</span>
             <select class="select-dark" @bind="selectedDifficultyMode">
-                <option value="Easy">Easy (0)</option>
-                <option value="Medium">Medium (1.0..1.3)</option>
-                <option value="Hard">Hard (1.4+ / 2)</option>
-                <option value="Expert">Expert (>=2)</option>
+                <option value="Trivial">Trivial (0 - Singles only)</option>
+                <option value="Easy">Easy (1.0 - Intersections)</option>
+                <option value="Medium">Medium (1.1 - Pairs/Triples/XY-Wing)</option>
+                <option value="Hard">Hard (1.2 - Quads/X-Wings)</option>
+                <option value="Challenging">Challenging (1.3+ / 2)</option>
+                <option value="Expert">Expert (&gt;=2 - Deep Search)</option>
                 <option value="Custom">Custom Target...</option>
             </select>
 
@@ -56,6 +58,11 @@
             {
                 <input class="input-pattern" @bind="customDifficultyPattern" placeholder="e.g. 1.0.2, 1.*, >=2" title="Enter rating pattern (e.g. 1.0.2, 1.2.*, >=2, 1.0..1.3)" />
             }
+
+            <label class="checkbox-label" title="Only accept puzzles where every deduction is a named human strategy (no raw forcing chains)">
+                <input type="checkbox" @bind="requireNamedStrategies" />
+                <span>Named strategies only</span>
+            </label>
 
             <button class="btn-tool" @onclick="GeneratePuzzle" disabled="@(isGenerating || isSolving)">
                 @(isGenerating ? "Generating..." : "Generate Puzzle")
@@ -302,7 +309,7 @@
                         <div class="stat-item">
                             <span class="stat-label">Rating</span>
                             <span class="stat-badge @GetDifficultyBadgeClass(currentSolution)">
-                                Lookahead: @currentSolution.MaxLookaheadUsed (Score: @currentSolution.Score)
+                                @currentSolution.DifficultyRating (@(currentSolution.MaxLookaheadUsed != 1 ? currentSolution.MaxLookaheadUsed.ToString() : $"{currentSolution.MaxLookaheadUsed}.{currentSolution.Score}.{currentSolution.HighTuples}"))
                             </span>
                         </div>
                         <div class="stat-item">
@@ -563,6 +570,7 @@
 
     private string selectedDifficultyMode = "Medium";
     private string customDifficultyPattern = "";
+    private bool requireNamedStrategies = false;
 
     private bool isSolving = false;
     private bool isGenerating = false;
@@ -664,15 +672,19 @@
 
     private DifficultyCriteria GetSelectedCriteria()
     {
-        return selectedDifficultyMode switch
+        var baseCriteria = selectedDifficultyMode switch
         {
+            "Trivial" => DifficultyCriteria.Trivial,
             "Easy" => DifficultyCriteria.Easy,
             "Medium" => DifficultyCriteria.Medium,
             "Hard" => DifficultyCriteria.Hard,
+            "Challenging" => DifficultyCriteria.Challenging,
             "Expert" => DifficultyCriteria.Expert,
             "Custom" => DifficultyCriteria.Custom(customDifficultyPattern),
             _ => DifficultyCriteria.Medium
         };
+
+        return baseCriteria with { NamedStrategiesOnly = requireNamedStrategies };
     }
 
     private async Task GeneratePuzzle()
@@ -1336,12 +1348,15 @@
 
     private string GetDifficultyBadgeClass(SudokuSolution sol)
     {
-        return sol.MaxLookaheadUsed switch
+        if (sol.MaxLookaheadUsed == 0) return "badge-easy";
+        if (sol.MaxLookaheadUsed == 1)
         {
-            0 => "badge-easy",
-            1 => "badge-medium",
-            _ => "badge-hard"
-        };
+            if (sol.Score == 0) return "badge-easy";
+            if (sol.Score == 1) return "badge-medium";
+            if (sol.Score == 2) return "badge-hard";
+            return "badge-expert";
+        }
+        return "badge-expert";
     }
 
     public void Dispose()

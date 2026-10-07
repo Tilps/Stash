@@ -6,25 +6,41 @@ public sealed record DifficultyCriteria
     public int? ExactLookahead { get; init; }
     public int? MinScore { get; init; }
     public int? MaxScore { get; init; }
+    public bool NamedStrategiesOnly { get; init; } = false;
 
-    public static DifficultyCriteria Easy { get; } = new()
+    public static DifficultyCriteria Trivial { get; } = new()
     {
         ExactLookahead = 0,
         TargetPattern = "0"
     };
 
+    public static DifficultyCriteria Easy { get; } = new()
+    {
+        ExactLookahead = 1,
+        MinScore = 0,
+        MaxScore = 0,
+        TargetPattern = "1.0"
+    };
+
     public static DifficultyCriteria Medium { get; } = new()
     {
         ExactLookahead = 1,
-        MaxScore = 3,
-        TargetPattern = "1.0..1.3"
+        MinScore = 1,
+        MaxScore = 1,
+        TargetPattern = "1.1"
     };
 
     public static DifficultyCriteria Hard { get; } = new()
     {
         ExactLookahead = 1,
-        MinScore = 4,
-        TargetPattern = "1.4+ / 2"
+        MinScore = 2,
+        MaxScore = 2,
+        TargetPattern = "1.2"
+    };
+
+    public static DifficultyCriteria Challenging { get; } = new()
+    {
+        TargetPattern = "1.3+ / 2"
     };
 
     public static DifficultyCriteria Expert { get; } = new()
@@ -40,28 +56,49 @@ public sealed record DifficultyCriteria
 
     public static DifficultyCriteria FromDifficulty(Difficulty difficulty) => difficulty switch
     {
+        Difficulty.Trivial => Trivial,
         Difficulty.Easy => Easy,
         Difficulty.Medium => Medium,
         Difficulty.Hard => Hard,
+        Difficulty.Challenging => Challenging,
         Difficulty.Expert => Expert,
         _ => Medium
     };
 
     public bool Matches(int lookahead, int score, int highTuples)
     {
+        if (this == Trivial || TargetPattern is "0" or "Trivial")
+        {
+            return lookahead == 0;
+        }
+
+        if (this == Easy || TargetPattern is "1.0" or "Easy")
+        {
+            return lookahead == 1 && score == 0;
+        }
+
+        if (this == Medium || TargetPattern is "1.1" or "Medium")
+        {
+            return lookahead == 1 && score == 1;
+        }
+
+        if (this == Hard || TargetPattern is "1.2" or "Hard")
+        {
+            return lookahead == 1 && score == 2;
+        }
+
+        if (this == Challenging || TargetPattern is "1.3+ / 2" or "Challenging")
+        {
+            return lookahead >= 2 || (lookahead == 1 && score >= 3);
+        }
+
+        if (this == Expert || TargetPattern is "2" or "Expert")
+        {
+            return lookahead >= 2;
+        }
+
         if (ExactLookahead.HasValue)
         {
-            if (this == Hard)
-            {
-                // Hard allows either deep lookahead 1 (score >= 4) OR lookahead >= 2
-                return lookahead >= 2 || (lookahead == 1 && score >= 4);
-            }
-
-            if (this == Expert)
-            {
-                return lookahead >= 2;
-            }
-
             if (lookahead != ExactLookahead.Value)
                 return false;
 
@@ -71,7 +108,7 @@ public sealed record DifficultyCriteria
             return true;
         }
 
-        if (string.IsNullOrWhiteSpace(TargetPattern) || TargetPattern is "0" or "Easy" or "Medium" or "Hard" or "Expert")
+        if (string.IsNullOrWhiteSpace(TargetPattern))
             return true;
 
         string currentRating = (lookahead != 1) ? lookahead.ToString() : $"{lookahead}.{score}.{highTuples}";

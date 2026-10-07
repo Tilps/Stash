@@ -162,13 +162,32 @@ public class BoardTests
     [Fact]
     public void DifficultyCriteria_MatchesCorrectly()
     {
+        var trivial = DifficultyCriteria.Trivial;
+        Assert.True(trivial.Matches(0, 0, 0));
+        Assert.False(trivial.Matches(1, 0, 0));
+
         var easy = DifficultyCriteria.Easy;
-        Assert.True(easy.Matches(0, 0, 0));
-        Assert.False(easy.Matches(1, 2, 2));
+        Assert.True(easy.Matches(1, 0, 0));
+        Assert.False(easy.Matches(0, 0, 0));
+        Assert.False(easy.Matches(1, 1, 0));
 
         var medium = DifficultyCriteria.Medium;
         Assert.True(medium.Matches(1, 1, 2));
         Assert.False(medium.Matches(0, 0, 0));
+        Assert.False(medium.Matches(1, 2, 0));
+
+        var hard = DifficultyCriteria.Hard;
+        Assert.True(hard.Matches(1, 2, 1));
+        Assert.False(hard.Matches(1, 1, 0));
+
+        var challenging = DifficultyCriteria.Challenging;
+        Assert.True(challenging.Matches(1, 3, 0));
+        Assert.True(challenging.Matches(2, 0, 0));
+        Assert.False(challenging.Matches(1, 2, 0));
+
+        var expert = DifficultyCriteria.Expert;
+        Assert.True(expert.Matches(2, 0, 0));
+        Assert.False(expert.Matches(1, 5, 2));
 
         var customWildcard = DifficultyCriteria.Custom("1.4.*");
         Assert.True(customWildcard.Matches(1, 4, 3));
@@ -177,6 +196,10 @@ public class BoardTests
         var customGte = DifficultyCriteria.Custom(">=2");
         Assert.True(customGte.Matches(2, 0, 0));
         Assert.False(customGte.Matches(1, 5, 2));
+
+        var namedOnly = DifficultyCriteria.Medium with { NamedStrategiesOnly = true };
+        Assert.True(namedOnly.NamedStrategiesOnly);
+        Assert.True(namedOnly.Matches(1, 1, 0));
     }
 
     [Fact]
@@ -329,7 +352,7 @@ public class BoardTests
 
         Assert.Equal(SolveState.Solved, sol.State);
         Assert.True(sol.IsSuccess);
-        Assert.Equal(2, sol.MaxLookaheadUsed);
+        Assert.Equal(1, sol.MaxLookaheadUsed);
         for (int r = 0; r < 9; r++)
         {
             for (int c = 0; c < 9; c++)
@@ -347,6 +370,7 @@ public class BoardTests
         board.MaxLookahead = 2;
         var sol = board.SolveWithRating();
         Assert.True(sol.IsSuccess);
+        Assert.Equal(2, sol.MaxLookaheadUsed);
     }
 
     [Fact]
@@ -586,6 +610,18 @@ public class BoardTests
         var swordfishStep = solution.Steps.FirstOrDefault(s => s.Type == DeductionType.Swordfish && s.Row == 3 && s.Col == 2 && s.Value == v);
         Assert.NotNull(swordfishStep);
         Assert.Contains("Swordfish", swordfishStep.Explanation);
+    }
+
+    [Fact]
+    public void Test_Generator_NamedStrategiesOnly()
+    {
+        var generator = new SudokuGenerator(3, 3, new Random(42));
+        var criteria = DifficultyCriteria.Trivial with { NamedStrategiesOnly = true };
+        var board = generator.Generate(criteria);
+        Assert.NotNull(board);
+
+        var solution = board.SolveFast();
+        Assert.Equal(SolveState.Solved, solution.State);
     }
 }
 

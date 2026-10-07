@@ -19,12 +19,15 @@ public sealed record SudokuSolution(
     {
         get
         {
-            if (MaxLookaheadUsed == 0 && Score <= 1)
-                return "Easy";
-            if (MaxLookaheadUsed <= 1 && Score <= 3)
-                return "Medium";
-            if (MaxLookaheadUsed <= 2)
-                return "Hard";
+            if (MaxLookaheadUsed == 0)
+                return "Trivial";
+            if (MaxLookaheadUsed == 1)
+            {
+                if (Score == 0) return "Easy";
+                if (Score == 1) return "Medium";
+                if (Score == 2) return "Hard";
+                return "Challenging";
+            }
             return "Expert";
         }
     }
