@@ -481,5 +481,33 @@ public class BoardTests
             await board.SolveWithRatingAsync(cancellationToken: cts.Token, enableYield: true);
         });
     }
+
+    [Fact]
+    public void Test_LookaheadDepthGreaterThan1_ClassifiedAsLookaheadElimination_WithoutMisleadingArrows()
+    {
+        var board = new Board(3, 3);
+        var bRows = new List<int> { 2, 8 };
+        var bCols = new List<int> { 0, 0 };
+        var bVals = new List<int> { 0, 0 };
+
+        var result = PatternClassifier.Classify(
+            board,
+            targetRow: 0,
+            targetCol: 1,
+            targetVal: 4,
+            bRows,
+            bCols,
+            bVals,
+            lookaheadDepth: 2,
+            scoring: 1
+        );
+
+        Assert.Equal(DeductionType.LookaheadElimination, result.Type);
+        Assert.Contains("Deep Lookahead (Depth 2)", result.Name);
+        Assert.Empty(result.Arrows);
+        Assert.Null(result.ChainSteps);
+        Assert.NotNull(result.ProofChain);
+        Assert.NotEmpty(result.ProofChain);
+    }
 }
 

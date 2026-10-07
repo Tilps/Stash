@@ -57,6 +57,11 @@ public static class PatternClassifier
         if (xywing != null) return xywing;
 
         // 7. General Forcing Chain / Branching Logic
+        if (lookaheadDepth > 1)
+        {
+            return BuildDeepLookaheadResult(board, targetRow, targetCol, targetVal, branchRows, branchCols, branchVals, lookaheadDepth, scoring, rawProofChain);
+        }
+
         return BuildForcingChainResult(board, targetRow, targetCol, targetVal, branchRows, branchCols, branchVals, lookaheadDepth, scoring, rawProofChain, branchChains);
     }
 
@@ -904,6 +909,50 @@ public static class PatternClassifier
             arrows,
             proofChain,
             chainSteps
+        );
+    }
+
+    private static ClassificationResult BuildDeepLookaheadResult(
+        Board board,
+        int targetRow,
+        int targetCol,
+        int targetVal,
+        IReadOnlyList<int> bRows,
+        IReadOnlyList<int> bCols,
+        IReadOnlyList<int> bVals,
+        int lookaheadDepth,
+        int scoring,
+        IReadOnlyList<string>? rawProofChain)
+    {
+        var involved = new HashSet<(int, int)> { (targetRow, targetCol) };
+        for (int i = 0; i < bRows.Count; i++)
+        {
+            involved.Add((bRows[i], bCols[i]));
+        }
+
+        var proofChain = new List<string>();
+        for (int a = 0; a < bRows.Count; a++)
+        {
+            int r = bRows[a];
+            int c = bCols[a];
+            int v = bVals[a] + 1;
+            proofChain.Add($"Hypothesis {a + 1}: If R{r + 1}C{c + 1} = {Board.FormatValue(v)} ➔ Multi-level search proves candidate {Board.FormatValue(targetVal)} impossible in R{targetRow + 1}C{targetCol + 1}");
+        }
+        proofChain.Add($"Conclusion: All {bRows.Count} branching hypotheses eliminate candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1}.");
+
+        string branchesDesc = string.Join(" or ", bRows.Zip(bCols.Zip(bVals, (c, v) => (c, v)), (r, cv) => $"R{r + 1}C{cv.c + 1}={Board.FormatValue(cv.v + 1)}"));
+        string expl = $"Deep Lookahead (Depth {lookaheadDepth}): Exhaustively testing all {bRows.Count} options ({branchesDesc}) eliminates candidate {Board.FormatValue(targetVal)} from R{targetRow + 1}C{targetCol + 1} via multi-level recursive search.";
+        string groupDesc = $"Nested Lookahead (Depth {lookaheadDepth})";
+
+        return new ClassificationResult(
+            DeductionType.LookaheadElimination,
+            $"Deep Lookahead (Depth {lookaheadDepth})",
+            expl,
+            groupDesc,
+            involved.ToList(),
+            new List<DeductionArrow>(),
+            proofChain,
+            null
         );
     }
 

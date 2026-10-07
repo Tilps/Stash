@@ -360,7 +360,40 @@
                                 @activeStep.Explanation
                             </p>
 
-                            @if (activeStep.ChainSteps != null && activeStep.ChainSteps.Count > 0)
+                            @if (activeStep.Type == DeductionType.LookaheadElimination)
+                            {
+                                <div class="deep-lookahead-card">
+                                    <div class="deep-lookahead-header">
+                                        <span class="deep-lookahead-icon">⚠️</span>
+                                        <div class="deep-lookahead-title-group">
+                                            <span class="deep-lookahead-title">Deep Lookahead Elimination</span>
+                                            <span class="deep-lookahead-badge">@activeStep.GroupDescription</span>
+                                        </div>
+                                    </div>
+                                    <div class="deep-lookahead-notice">
+                                        <p>
+                                            This deduction was established via multi-level nested trial search (depth &gt; 1).
+                                            Because the underlying logic involves a recursive branching tree rather than a linear chain of cell links, it cannot be represented as a single sequence of arrows.
+                                        </p>
+                                    </div>
+                                    @if (activeStep.ProofChain != null && activeStep.ProofChain.Count > 0)
+                                    {
+                                        <div class="deep-lookahead-branches">
+                                            <div class="deep-lookahead-branches-title">Evaluated Branch Hypotheses:</div>
+                                            <div class="deep-lookahead-list">
+                                                @foreach (var line in activeStep.ProofChain)
+                                                {
+                                                    <div class="deep-lookahead-item">
+                                                        <span class="deep-lookahead-bullet">▪</span>
+                                                        <span>@line</span>
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            else if (activeStep.ChainSteps != null && activeStep.ChainSteps.Count > 0)
                             {
                                 <div class="chain-walkthrough-container">
                                     <div class="chain-walkthrough-header">
@@ -1051,7 +1084,7 @@
         DeductionType.Jellyfish => "Jellyfish",
         DeductionType.XYWing => "XY-Wing",
         DeductionType.ForcingChain => "Forcing Chain",
-        DeductionType.LookaheadElimination => "Contradiction Chain",
+        DeductionType.LookaheadElimination => "Deep Lookahead",
         _ => type.ToString()
     };
 
@@ -1063,7 +1096,8 @@
         DeductionType.HiddenPair or DeductionType.HiddenTriple => "badge-hidden-subset",
         DeductionType.XWing or DeductionType.Swordfish or DeductionType.Jellyfish => "badge-fish",
         DeductionType.XYWing => "badge-wing",
-        DeductionType.ForcingChain or DeductionType.LookaheadElimination => "badge-forcing",
+        DeductionType.ForcingChain => "badge-forcing",
+        DeductionType.LookaheadElimination => "badge-lookahead",
         _ => "badge-placement"
     };
 
