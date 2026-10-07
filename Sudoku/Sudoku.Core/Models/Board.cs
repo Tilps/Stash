@@ -717,7 +717,7 @@ public class Board
         }
 
         // Evaluate subset-derived trials (Naked Subsets and Hidden Subsets of size 'depth' in units)
-        if (scoring >= 2)
+        if (scoring >= 2 && depth <= width / 2)
         {
             if (yieldCallback != null) await yieldCallback($"Lookahead {lookahead}: testing subsets of size {depth}...");
             SolveState subsetState = PassUnitSubsetsLookaheadLogic(depth, lookahead, structuredSteps);
@@ -898,7 +898,7 @@ public class Board
     private SolveState PassUnitSubsetsLookaheadLogic(int depth, int lookahead, List<DeductionStep>? structuredSteps = null)
     {
         if (scoring < 2) return SolveState.MultipleSolutions;
-        if (depth < 2 || depth > width) return SolveState.MultipleSolutions;
+        if (depth < 2 || depth > width / 2) return SolveState.MultipleSolutions;
 
         for (int unitType = 0; unitType < 3; unitType++)
         {

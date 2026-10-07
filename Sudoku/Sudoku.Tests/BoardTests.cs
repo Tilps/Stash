@@ -509,5 +509,20 @@ public class BoardTests
         Assert.NotNull(result.ProofChain);
         Assert.NotEmpty(result.ProofChain);
     }
+
+    [Fact]
+    public void Test_UnitSubset_BoundedByWidthDiv2()
+    {
+        var board = new Board(3, 3);
+        // Verify width is 9, so width / 2 is 4
+        Assert.Equal(9, board.Width);
+
+        // Run rating solve on a preset with quads / subsets
+        var preset = PresetPuzzle.Presets.First(p => p.Title == "Classic Hard");
+        var testBoard = Board.Parse(preset.Clues, preset.SizeX, preset.SizeY);
+        testBoard.MaxLookahead = 2;
+        var sol = testBoard.SolveWithRating();
+        Assert.True(sol.IsSuccess);
+    }
 }
 
